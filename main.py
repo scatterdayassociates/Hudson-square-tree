@@ -555,15 +555,15 @@ def main():
     
     # Sidebar with enhanced styling
     with st.sidebar:
-        st.markdown("### 🔍 Analysis Settings")
+        st.markdown("#  Analysis Settings")
         st.markdown("**Configure study parameters**")
         
         st.markdown("---")
-        st.markdown("**📍 Study Area**")
+        st.markdown("**Study Area**")
         st.markdown("Hudson Square, NYC")
         
         st.markdown("---")
-        st.markdown("**🗺️ Coordinates**")
+        st.markdown("**Coordinates**")
         col1, col2 = st.columns(2)
         with col1:
             st.metric("West", f"{HUDSON_SQUARE_BOUNDS['west']}")
