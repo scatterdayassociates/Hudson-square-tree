@@ -542,6 +542,15 @@ def create_map(tree_2021, tree_2023, cover_2021, cover_2023):
     return Map
 
 def main():
+    # Initialize session state variables
+    if 'analysis_run' not in st.session_state:
+        st.session_state.analysis_run = False
+    if 'year1' not in st.session_state:
+        st.session_state.year1 = 2021
+    if 'year2' not in st.session_state:
+        st.session_state.year2 = 2023
+    
+    # Professional Header with gradient styling
 
     
     # Sidebar with enhanced styling
@@ -615,9 +624,6 @@ def main():
     """, unsafe_allow_html=True)
     
     # Default state - show when no analysis has been run
-    if 'analysis_run' not in st.session_state:
-        st.session_state.analysis_run = False
-    
     if not st.session_state.analysis_run:
         st.markdown("""
         <div style="background: hsl(var(--muted) / 0.3); border: 2px dashed hsl(var(--border)); border-radius: var(--radius); padding: 2rem; text-align: center; margin: 2rem 0;">
