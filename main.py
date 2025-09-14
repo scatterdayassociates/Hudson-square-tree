@@ -646,11 +646,7 @@ def main():
             st.session_state.selected_year2 = year2
             st.rerun()
         
-        # Reset button to run new analysis
-        if st.session_state.analysis_run:
-            if st.button("🔄 Run New Analysis", use_container_width=True):
-                st.session_state.analysis_run = False
-                st.rerun()
+      
     
     # Authentication status with professional styling
     with st.spinner("Authenticating with Google Earth Engine..."):
