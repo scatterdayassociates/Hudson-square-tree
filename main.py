@@ -583,15 +583,35 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         HUDSON_SQUARE_BOUNDS['north']
     ])
     
-    # Initialize the map with appropriate zoom limits
+    # Initialize the map with zoom limits using Folium directly
     Map = geemap.Map(
         center=[40.725, -74.005], 
         zoom=16, 
         width='100%', 
-        height='600px',
-        max_zoom=18,  # Prevent zooming beyond Earth Engine's data resolution
-        min_zoom=10   # Set reasonable min zoom
+        height='600px'
     )
+    
+    # Set zoom limits on the underlying Folium map
+    try:
+        Map._map.options['maxZoom'] = 18
+        Map._map.options['minZoom'] = 10
+    except:
+        # Alternative approach if the above doesn't work
+        Map.get_root().html.add_child(
+            folium.Element("""
+            <script>
+            setTimeout(function() {
+                var maps = document.querySelectorAll('.folium-map');
+                maps.forEach(function(mapEl) {
+                    if (mapEl._leaflet_map) {
+                        mapEl._leaflet_map.setMaxZoom(18);
+                        mapEl._leaflet_map.setMinZoom(10);
+                    }
+                });
+            }, 1000);
+            </script>
+            """)
+        )
 
     # Add base map first
     try:
