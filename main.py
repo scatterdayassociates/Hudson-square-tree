@@ -589,7 +589,7 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         zoom=16, 
         width='100%', 
         height='600px',
-        max_zoom=20,  # Set reasonable max zoom
+        max_zoom=18,  # Prevent zooming beyond Earth Engine's data resolution
         min_zoom=10   # Set reasonable min zoom
     )
 
@@ -960,7 +960,7 @@ def main():
                     </div>
                 </div>
                 <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                    <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Zooming beyond level 18 may show gray areas due to Earth Engine's zoom restrictions. 
+                    <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
                     Use the layer controls to toggle tree cover layers on/off for better visibility.
                 </div>
             </div>
@@ -1083,7 +1083,7 @@ def main():
                 </div>
             </div>
             <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Zooming beyond level 18 may show gray areas due to Earth Engine's zoom restrictions. 
+                <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
                 Use the layer controls to toggle tree cover layers on/off for better visibility.
             </div>
         </div>
