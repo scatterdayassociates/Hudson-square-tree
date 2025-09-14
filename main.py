@@ -400,7 +400,7 @@ def authenticate_ee():
         # Method 1: Try local authentication first (for development)
         try:
             ee.Initialize(project=PROJECT_ID)
-            return True, "✅ Using existing local Earth Engine authentication"
+            return True, "✅ Google Earth Engine authenticated successfully"
         except Exception as local_error:
             pass
         
@@ -413,7 +413,7 @@ def authenticate_ee():
                     key_data=json.dumps(service_account_info)
                 )
                 ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "✅ Authenticated via Streamlit secrets"
+                return True, "✅ Google Earth Engine authenticated successfully"
         except Exception as secrets_error:
             pass
             
@@ -422,7 +422,7 @@ def authenticate_ee():
             try:
                 credentials = ee.ServiceAccountCredentials(None, 'private-key.json')
                 ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "✅ Authenticated via local service account (private-key.json)"
+                return True, "✅ Google Earth Engine authenticated successfully"
             except Exception as sa_error:
                 pass
                 
@@ -432,7 +432,7 @@ def authenticate_ee():
                 credentials_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
                 credentials = ee.ServiceAccountCredentials(None, credentials_path)
                 ee.Initialize(credentials, project=PROJECT_ID)
-                return True, f"✅ Authenticated via environment variable: {credentials_path}"
+                return True, "✅ Google Earth Engine authenticated successfully"
             except Exception as env_error:
                 pass
         
@@ -440,7 +440,7 @@ def authenticate_ee():
         try:
             ee.Authenticate()
             ee.Initialize(project=PROJECT_ID)
-            return True, f"✅ Re-authenticated with project: {PROJECT_ID}"
+            return True, "✅ Google Earth Engine authenticated successfully"
         except Exception as auth_error:
             pass
         
@@ -604,6 +604,10 @@ def main():
         st.session_state.selected_year1 = 2010
     if 'selected_year2' not in st.session_state:
         st.session_state.selected_year2 = 2017
+    if 'map_created' not in st.session_state:
+        st.session_state.map_created = False
+    if 'map_data' not in st.session_state:
+        st.session_state.map_data = None
     
     # Professional Header with gradient styling
 
@@ -645,6 +649,14 @@ def main():
             st.session_state.selected_year1 = year1
             st.session_state.selected_year2 = year2
             st.rerun()
+        
+        # Reset button to run new analysis
+        if st.session_state.analysis_run:
+            if st.button("🔄 Run New Analysis", use_container_width=True):
+                st.session_state.analysis_run = False
+                st.session_state.map_created = False
+                st.session_state.map_data = None
+                st.rerun()
         
       
     
@@ -757,7 +769,16 @@ def main():
             status_text.text("Creating interactive map...")
             progress_bar.progress(80)
             
-            map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
+            # Store map data in session state for persistence
+            st.session_state.map_data = {
+                'tree_data_1': tree_data_1,
+                'tree_data_2': tree_data_2,
+                'cover_1': cover_1,
+                'cover_2': cover_2,
+                'year1': year1,
+                'year2': year2
+            }
+            st.session_state.map_created = True
             
             progress_bar.progress(100)
             status_text.text("Analysis complete!")
@@ -849,6 +870,8 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
+            # Create and display the map
+            map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
             map_obj.to_streamlit(height=600)
             
             # Enhanced Methodology Section
@@ -933,11 +956,49 @@ def main():
                 </p>
             </div>
             """, unsafe_allow_html=True)
+    
+    # Persistent map display - show map even when analysis is complete
+    elif st.session_state.map_created and st.session_state.map_data:
+        st.markdown("---")
+        st.markdown("## 🗺️ Interactive Map")
+        st.markdown("*Map persists for continued exploration*")
+        
+        # Get stored map data
+        map_data = st.session_state.map_data
+        year1 = map_data['year1']
+        year2 = map_data['year2']
+        
+        st.markdown(f"""
+        <div class="map-container">
+            <h4>Land cover analysis showing tree coverage changes in Hudson Square area</h4>
+            <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 1rem; height: 1rem; background-color: #22c55e; border-radius: 2px;"></div>
+                    <span>Green: {year2} Tree Cover</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 1rem; height: 1rem; background-color: #8b5cf6; border-radius: 2px;"></div>
+                    <span>Purple: {year1} Tree Cover</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Recreate and display the map
+        map_obj = create_map(
+            map_data['tree_data_1'], 
+            map_data['tree_data_2'], 
+            map_data['cover_1'], 
+            map_data['cover_2'], 
+            year1, 
+            year2
+        )
+        map_obj.to_streamlit(height=600)
             
-        except Exception as e:
-            st.error(f"Analysis failed: {str(e)}")
-            progress_bar.empty()
-            status_text.empty()
+    except Exception as e:
+        st.error(f"Analysis failed: {str(e)}")
+        progress_bar.empty()
+        status_text.empty()
 
 if __name__ == "__main__":
     main()
