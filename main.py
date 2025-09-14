@@ -751,7 +751,7 @@ def main():
                 cover_2 = 0.0
             
             # Debug information
-            st.info(f"Using official NYC Tree Canopy Assessment figures: {year1} = {cover_1}%, {year2} = {cover_2}%")
+         
             
             # Create visualization
             status_text.text("Creating interactive map...")
