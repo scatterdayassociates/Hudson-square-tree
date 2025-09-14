@@ -529,8 +529,12 @@ def get_tree_cover(year):
             print(f"No tree pixels found for {year}, using class 2 as default")
             best_tree_mask = landcover.eq(2).multiply(100)
         
-        # Rename the band for consistency
+        # Enhance visibility by adding some contrast and ensuring minimum values
+        # This helps with visibility at high zoom levels
         tree_cover = best_tree_mask.rename('tree_cover')
+        
+        # Add a small buffer to make tree areas more visible
+        tree_cover = tree_cover.focal_max(radius=1, kernelType='circle', units='pixels')
         
         return tree_cover, None
     except Exception as e:
