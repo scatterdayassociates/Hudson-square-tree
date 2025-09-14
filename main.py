@@ -490,12 +490,47 @@ def get_tree_cover(year):
         # Common land cover classification values:
         # 1 = Water, 2 = Tree Canopy, 3 = Grass/Shrub, 4 = Bare Earth, 5 = Buildings, 6 = Roads
         
-        # Create tree cover mask (assuming class 2 represents tree canopy)
-        # We'll create a binary mask where tree canopy = 1, everything else = 0
-        tree_mask = landcover.eq(2).multiply(100)  # Convert to percentage (0 or 100)
+        # Let's first check what values are actually in the data
+        unique_values = landcover.reduceRegion(
+            reducer=ee.Reducer.frequencyHistogram(),
+            geometry=hudson_square,
+            scale=30,
+            bestEffort=True,
+            maxPixels=1e10
+        ).getInfo()
+        
+        print(f"Unique values in {year} data: {unique_values}")
+        
+        # Try different possible tree canopy class values
+        # Common values: 2, 3, 4, or sometimes 1 for vegetation
+        possible_tree_classes = [1, 2, 3, 4]
+        best_tree_mask = None
+        max_tree_pixels = 0
+        
+        for tree_class in possible_tree_classes:
+            test_mask = landcover.eq(tree_class)
+            test_stats = test_mask.reduceRegion(
+                reducer=ee.Reducer.sum(),
+                geometry=hudson_square,
+                scale=30,
+                bestEffort=True,
+                maxPixels=1e10
+            ).getInfo()
+            
+            # Get the first (and likely only) band value
+            test_sum = list(test_stats.values())[0] if test_stats else 0
+            print(f"Class {tree_class} pixels for {year}: {test_sum}")
+            
+            if test_sum > max_tree_pixels:
+                max_tree_pixels = test_sum
+                best_tree_mask = test_mask.multiply(100)  # Convert to percentage
+        
+        if best_tree_mask is None:
+            print(f"No tree pixels found for {year}, using class 2 as default")
+            best_tree_mask = landcover.eq(2).multiply(100)
         
         # Rename the band for consistency
-        tree_cover = tree_mask.rename('tree_cover')
+        tree_cover = best_tree_mask.rename('tree_cover')
         
         return tree_cover, None
     except Exception as e:
