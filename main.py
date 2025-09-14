@@ -956,6 +956,11 @@ def main():
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Analysis failed: {str(e)}")
+            progress_bar.empty()
+            status_text.empty()
     
     # Persistent map display - show map even when analysis is complete
     elif st.session_state.map_created and st.session_state.map_data:
@@ -994,11 +999,6 @@ def main():
             year2
         )
         map_obj.to_streamlit(height=600)
-            
-    except Exception as e:
-        st.error(f"Analysis failed: {str(e)}")
-        progress_bar.empty()
-        status_text.empty()
 
 if __name__ == "__main__":
     main()
