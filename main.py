@@ -6,6 +6,7 @@ from folium.plugins import Fullscreen
 import json
 import os
 from datetime import datetime
+import streamlit.components.v1 as components
 
 # Page configuration
 st.set_page_config(
@@ -583,97 +584,62 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         HUDSON_SQUARE_BOUNDS['north']
     ])
     
-    # Initialize the map
+    # Initialize the map with better settings for Streamlit
     Map = geemap.Map(
         center=[40.725, -74.005], 
         zoom=16, 
         width='100%', 
-        height='600px'
+        height='600px',
+        scroll_wheel_zoom=True,
+        dragging=True
     )
 
-    # Add base map first
+    # Add base map first - use a more reliable one
     try:
-        Map.add_basemap('CartoDB Positron')
+        Map.add_basemap('OpenStreetMap')
     except:
         try:
-            Map.add_basemap('OpenStreetMap')
+            Map.add_basemap('CartoDB Positron')
         except:
-            pass  # Continue without base map if needed
+            pass
 
     # Clip the tree cover layers to Hudson Square
     tree_year1_clipped = tree_year1.clip(hudson_square)
     tree_year2_clipped = tree_year2.clip(hudson_square)
 
-    # Get actual data ranges for proper visualization
-    try:
-        # Get min/max values for proper scaling
-        stats1 = tree_year1_clipped.reduceRegion(
-            reducer=ee.Reducer.minMax(),
-            geometry=hudson_square,
-            scale=30,
-            bestEffort=True,
-            maxPixels=1e9
-        ).getInfo()
-        
-        stats2 = tree_year2_clipped.reduceRegion(
-            reducer=ee.Reducer.minMax(),
-            geometry=hudson_square,
-            scale=30,
-            bestEffort=True,
-            maxPixels=1e9
-        ).getInfo()
-        
-        print(f"Data range for {year1}: {stats1}")
-        print(f"Data range for {year2}: {stats2}")
-        
-        # Use actual data ranges or defaults
-        min_val1 = stats1.get('tree_cover_min', 0) if stats1 else 0
-        max_val1 = stats1.get('tree_cover_max', 100) if stats1 else 100
-        min_val2 = stats2.get('tree_cover_min', 0) if stats2 else 0
-        max_val2 = stats2.get('tree_cover_max', 100) if stats2 else 100
-        
-    except Exception as e:
-        print(f"Error getting data ranges: {e}")
-        min_val1 = min_val2 = 0
-        max_val1 = max_val2 = 100
-
-    # Robust visualization parameters
+    # Simplified visualization parameters - avoid transparency issues
     vis_params_year1 = {
-        'min': min_val1, 
-        'max': max_val1, 
-        'palette': ['00000000', '#8b5cf6', '#7c3aed'],  # Transparent to purple
-        'opacity': 0.7
+        'min': 0, 
+        'max': 100, 
+        'palette': ['white', '#8b5cf6', '#7c3aed'],
+        'opacity': 0.6
     }
     
     vis_params_year2 = {
-        'min': min_val2, 
-        'max': max_val2, 
-        'palette': ['00000000', '#22c55e', '#16a34a'],  # Transparent to green
-        'opacity': 0.7
+        'min': 0, 
+        'max': 100, 
+        'palette': ['white', '#22c55e', '#16a34a'],
+        'opacity': 0.6
     }
 
-    # Add tree cover layers with error handling
+    # Add tree cover layers
     try:
         Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
-    except Exception as e:
-        print(f"Error adding {year2} layer: {e}")
-    
-    try:
         Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
     except Exception as e:
-        print(f"Error adding {year1} layer: {e}")
+        print(f"Error adding layers: {e}")
     
     # Add boundary
     try:
         Map.addLayer(hudson_square, {
             'color': 'red', 
             'fillColor': 'transparent',
-            'width': 3
+            'width': 2
         }, 'Hudson Square Boundary', shown=True)
     except Exception as e:
         print(f"Error adding boundary: {e}")
 
-    # Center the map properly
+    # Center the map
     try:
         Map.centerObject(hudson_square, 16)
     except Exception as e:
@@ -686,6 +652,42 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         print(f"Error adding layer control: {e}")
 
     return Map
+
+def create_alternative_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
+    """Create an alternative map using pure Folium to avoid geemap issues."""
+    hudson_square = ee.Geometry.Rectangle([
+        HUDSON_SQUARE_BOUNDS['west'],
+        HUDSON_SQUARE_BOUNDS['south'],
+        HUDSON_SQUARE_BOUNDS['east'],
+        HUDSON_SQUARE_BOUNDS['north']
+    ])
+    
+    # Create a basic Folium map
+    m = folium.Map(
+        location=[40.725, -74.005],
+        zoom_start=16,
+        width='100%',
+        height=600,
+        tiles='OpenStreetMap'
+    )
+    
+    # Add the boundary
+    folium.Rectangle(
+        bounds=[[HUDSON_SQUARE_BOUNDS['south'], HUDSON_SQUARE_BOUNDS['west']], 
+                [HUDSON_SQUARE_BOUNDS['north'], HUDSON_SQUARE_BOUNDS['east']]],
+        color='red',
+        fill=False,
+        weight=2
+    ).add_to(m)
+    
+    # Add a marker with information
+    folium.Marker(
+        [40.725, -74.005],
+        popup=f"Tree Cover Analysis<br>{year1}: {cover_year1:.1f}%<br>{year2}: {cover_year2:.1f}%",
+        icon=folium.Icon(color='green', icon='tree')
+    ).add_to(m)
+    
+    return m
 
 def main():
     # Initialize session state variables
@@ -731,6 +733,10 @@ def main():
         if year1 == year2:
             st.error("Please select different years for comparison!")
             return
+        
+        st.markdown("---")
+        st.markdown("**🗺️ Map Options**")
+        use_alternative_map = st.checkbox("Use Alternative Map (if geemap has issues)", value=False)
         
         st.markdown("---")
         
@@ -960,9 +966,19 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Create and display the map
-            map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
-            map_obj.to_streamlit(height=600)
+            # Create and display the map based on user choice
+            if use_alternative_map:
+                st.info("Using alternative map (pure Folium) to avoid zoom issues")
+                alt_map = create_alternative_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
+                components.html(alt_map._repr_html_(), height=600)
+            else:
+                try:
+                    map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
+                    map_obj.to_streamlit(height=600)
+                except Exception as e:
+                    st.warning(f"Geemap failed: {e}. Using alternative map.")
+                    alt_map = create_alternative_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
+                    components.html(alt_map._repr_html_(), height=600)
             
             # Enhanced Methodology Section
             st.markdown("""
@@ -1079,16 +1095,28 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Recreate and display the map
-        map_obj = create_map(
-            map_data['tree_data_1'], 
-            map_data['tree_data_2'], 
-            map_data['cover_1'], 
-            map_data['cover_2'], 
-            year1, 
-            year2
-        )
-        map_obj.to_streamlit(height=600)
+        # Recreate and display the map with fallback
+        try:
+            map_obj = create_map(
+                map_data['tree_data_1'], 
+                map_data['tree_data_2'], 
+                map_data['cover_1'], 
+                map_data['cover_2'], 
+                year1, 
+                year2
+            )
+            map_obj.to_streamlit(height=600)
+        except Exception as e:
+            st.warning(f"Geemap failed: {e}. Using alternative map.")
+            alt_map = create_alternative_map(
+                map_data['tree_data_1'], 
+                map_data['tree_data_2'], 
+                map_data['cover_1'], 
+                map_data['cover_2'], 
+                year1, 
+                year2
+            )
+            components.html(alt_map._repr_html_(), height=600)
 
 if __name__ == "__main__":
     main()
