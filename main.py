@@ -437,7 +437,7 @@ def authenticate_ee():
         return False, f"❌ Authentication failed: {str(e)}"
 
 def get_tree_cover(year):
-    """Fetch tree cover for the given year with improved zoom handling."""
+    """Fetch tree cover for the given year with proper data handling."""
     try:
         hudson_square = ee.Geometry.Rectangle([
             HUDSON_SQUARE_BOUNDS['west'],
@@ -457,58 +457,84 @@ def get_tree_cover(year):
         # Load the land cover image
         landcover = ee.Image(asset_id)
         
-        # Get band names and unique values for debugging
+        # Get basic image info
         band_names = landcover.bandNames().getInfo()
         print(f"Available bands for {year}: {band_names}")
         
-        # Get unique values in the study area
+        # Get image projection and scale info
+        projection = landcover.projection().getInfo()
+        print(f"Image projection for {year}: {projection}")
+        
+        # Check if data exists in the study area
+        sample = landcover.sample(
+            region=hudson_square,
+            scale=30,
+            numPixels=100
+        )
+        
+        # Get a sample of values to understand the data
+        sample_values = sample.aggregate_array(band_names[0]).getInfo()
+        print(f"Sample values for {year}: {sample_values[:10]}...")  # First 10 values
+        
+        # Create a simple tree mask - try different approaches
+        # First, let's see what values actually exist
         unique_values = landcover.reduceRegion(
             reducer=ee.Reducer.frequencyHistogram(),
             geometry=hudson_square,
-            scale=10,  # Use finer scale for better resolution
+            scale=30,
             bestEffort=True,
-            maxPixels=1e10
+            maxPixels=1e9
         ).getInfo()
         
         print(f"Unique values in {year} data: {unique_values}")
         
-        # Find the best tree class (same logic as before)
-        possible_tree_classes = [1, 2, 3, 4]
-        best_tree_mask = None
-        max_tree_pixels = 0
+        # Try to identify tree/vegetation classes
+        # Common NYC land cover classes: 1=Water, 2=Tree, 3=Grass, 4=Bare, 5=Building, 6=Road
+        tree_classes = [2, 3]  # Tree and grass/shrub
+        tree_mask = None
         
-        for tree_class in possible_tree_classes:
-            test_mask = landcover.eq(tree_class)
-            test_stats = test_mask.reduceRegion(
+        for tree_class in tree_classes:
+            class_mask = landcover.eq(tree_class)
+            class_count = class_mask.reduceRegion(
                 reducer=ee.Reducer.sum(),
                 geometry=hudson_square,
-                scale=10,  # Finer scale
+                scale=30,
                 bestEffort=True,
-                maxPixels=1e10
+                maxPixels=1e9
             ).getInfo()
             
-            test_sum = list(test_stats.values())[0] if test_stats else 0
-            print(f"Class {tree_class} pixels for {year}: {test_sum}")
+            count = list(class_count.values())[0] if class_count else 0
+            print(f"Class {tree_class} count for {year}: {count}")
             
-            if test_sum > max_tree_pixels:
-                max_tree_pixels = test_sum
-                best_tree_mask = test_mask
+            if count > 0:
+                if tree_mask is None:
+                    tree_mask = class_mask
+                else:
+                    tree_mask = tree_mask.Or(class_mask)
         
-        if best_tree_mask is None:
-            print(f"No tree pixels found for {year}, using class 2 as default")
-            best_tree_mask = landcover.eq(2)
+        # If no specific tree classes found, use all non-zero values
+        if tree_mask is None:
+            print(f"No tree classes found for {year}, using all non-zero values")
+            tree_mask = landcover.gt(0)
         
-        # Create a binary tree mask (0 or 100) instead of percentage
-        # This provides clearer visualization at all zoom levels
-        tree_cover = best_tree_mask.multiply(100).byte()
+        # Convert to percentage and ensure proper data type
+        tree_cover = tree_mask.multiply(100).byte()
         
-        # Optional: Apply a small morphological operation to fill gaps
-        # but be more conservative to preserve detail
-        tree_cover = tree_cover.focal_max(radius=0.5, kernelType='circle', units='pixels')
+        # Verify the result has data
+        result_stats = tree_cover.reduceRegion(
+            reducer=ee.Reducer.minMax(),
+            geometry=hudson_square,
+            scale=30,
+            bestEffort=True,
+            maxPixels=1e9
+        ).getInfo()
+        
+        print(f"Tree cover min/max for {year}: {result_stats}")
         
         return tree_cover.rename('tree_cover'), None
         
     except Exception as e:
+        print(f"Error in get_tree_cover for {year}: {str(e)}")
         return None, str(e)
 
 def calculate_coverage(image, geometry, band_name='tree_cover'):
@@ -549,7 +575,7 @@ def calculate_coverage(image, geometry, band_name='tree_cover'):
         return 0.0, str(e)
 
 def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
-    """Create the interactive map with improved visualization parameters."""
+    """Create the interactive map with robust visualization parameters."""
     hudson_square = ee.Geometry.Rectangle([
         HUDSON_SQUARE_BOUNDS['west'],
         HUDSON_SQUARE_BOUNDS['south'],
@@ -565,45 +591,99 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         height='600px'
     )
 
+    # Add base map first
+    try:
+        Map.add_basemap('CartoDB Positron')
+    except:
+        try:
+            Map.add_basemap('OpenStreetMap')
+        except:
+            pass  # Continue without base map if needed
+
     # Clip the tree cover layers to Hudson Square
     tree_year1_clipped = tree_year1.clip(hudson_square)
     tree_year2_clipped = tree_year2.clip(hudson_square)
 
-    # Improved visualization parameters for better zoom visibility
+    # Get actual data ranges for proper visualization
+    try:
+        # Get min/max values for proper scaling
+        stats1 = tree_year1_clipped.reduceRegion(
+            reducer=ee.Reducer.minMax(),
+            geometry=hudson_square,
+            scale=30,
+            bestEffort=True,
+            maxPixels=1e9
+        ).getInfo()
+        
+        stats2 = tree_year2_clipped.reduceRegion(
+            reducer=ee.Reducer.minMax(),
+            geometry=hudson_square,
+            scale=30,
+            bestEffort=True,
+            maxPixels=1e9
+        ).getInfo()
+        
+        print(f"Data range for {year1}: {stats1}")
+        print(f"Data range for {year2}: {stats2}")
+        
+        # Use actual data ranges or defaults
+        min_val1 = stats1.get('tree_cover_min', 0) if stats1 else 0
+        max_val1 = stats1.get('tree_cover_max', 100) if stats1 else 100
+        min_val2 = stats2.get('tree_cover_min', 0) if stats2 else 0
+        max_val2 = stats2.get('tree_cover_max', 100) if stats2 else 100
+        
+    except Exception as e:
+        print(f"Error getting data ranges: {e}")
+        min_val1 = min_val2 = 0
+        max_val1 = max_val2 = 100
+
+    # Robust visualization parameters
     vis_params_year1 = {
-        'min': 0, 
-        'max': 100, 
-        'palette': ['ffffff00', '#8b5cf6', '#7c3aed'],  # Transparent to purple
-        'opacity': 0.8
+        'min': min_val1, 
+        'max': max_val1, 
+        'palette': ['00000000', '#8b5cf6', '#7c3aed'],  # Transparent to purple
+        'opacity': 0.7
     }
     
     vis_params_year2 = {
-        'min': 0, 
-        'max': 100, 
-        'palette': ['ffffff00', '#22c55e', '#16a34a'],  # Transparent to green
-        'opacity': 0.8
+        'min': min_val2, 
+        'max': max_val2, 
+        'palette': ['00000000', '#22c55e', '#16a34a'],  # Transparent to green
+        'opacity': 0.7
     }
 
-    # Add base map
+    # Add tree cover layers with error handling
     try:
-        Map.add_basemap('CartoDB Positron')
-    except:
-        Map.add_basemap('OpenStreetMap')
+        Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
+    except Exception as e:
+        print(f"Error adding {year2} layer: {e}")
     
-    # Add tree cover layers
-    Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
-    Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
+    try:
+        Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
+    except Exception as e:
+        print(f"Error adding {year1} layer: {e}")
     
     # Add boundary
-    Map.addLayer(hudson_square, {
-        'color': 'red', 
-        'fillColor': 'transparent',
-        'width': 3
-    }, 'Hudson Square Boundary', shown=True)
+    try:
+        Map.addLayer(hudson_square, {
+            'color': 'red', 
+            'fillColor': 'transparent',
+            'width': 3
+        }, 'Hudson Square Boundary', shown=True)
+    except Exception as e:
+        print(f"Error adding boundary: {e}")
 
     # Center the map properly
-    Map.centerObject(hudson_square, 16)
-    Map.addLayerControl()
+    try:
+        Map.centerObject(hudson_square, 16)
+    except Exception as e:
+        print(f"Error centering map: {e}")
+    
+    # Add layer control
+    try:
+        Map.addLayerControl()
+    except Exception as e:
+        print(f"Error adding layer control: {e}")
 
     return Map
 
