@@ -574,8 +574,10 @@ def calculate_coverage(image, geometry, band_name='tree_cover'):
         print(f"Coverage calculation error: {str(e)}")
         return 0.0, str(e)
 
+# Replace your create_map function with this updated version
+
 def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
-    """Create the interactive map with robust visualization parameters."""
+    """Create the interactive map with robust zoom restrictions."""
     hudson_square = ee.Geometry.Rectangle([
         HUDSON_SQUARE_BOUNDS['west'],
         HUDSON_SQUARE_BOUNDS['south'],
@@ -583,121 +585,117 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         HUDSON_SQUARE_BOUNDS['north']
     ])
     
-    # Initialize the map with zoom limits using Folium directly
-    Map = geemap.Map(
-        center=[40.725, -74.005], 
-        zoom=16, 
-        width='100%', 
-        height='600px'
-    )
-    
-    # Set zoom limits on the underlying Folium map
+    # SOLUTION 1: Use ee_initialize with proper map options
     try:
-        Map._map.options['maxZoom'] = 18
-        Map._map.options['minZoom'] = 10
-    except:
-        # Alternative approach if the above doesn't work
-        Map.get_root().html.add_child(
-            folium.Element("""
-            <script>
-            setTimeout(function() {
-                var maps = document.querySelectorAll('.folium-map');
-                maps.forEach(function(mapEl) {
-                    if (mapEl._leaflet_map) {
-                        mapEl._leaflet_map.setMaxZoom(18);
-                        mapEl._leaflet_map.setMinZoom(10);
-                    }
-                });
-            }, 1000);
-            </script>
-            """)
+        # Create map with explicit folium parameters
+        import folium
+        from folium.plugins import Fullscreen
+        
+        # Create folium map directly with zoom restrictions
+        folium_map = folium.Map(
+            location=[40.725, -74.005],
+            zoom_start=16,
+            max_zoom=18,
+            min_zoom=12,
+            tiles='CartoDB Positron',
+            attr='CartoDB'
         )
+        
+        # Convert to geemap Map
+        Map = geemap.Map()
+        Map._map = folium_map
+        
+    except Exception:
+        # Fallback to regular geemap initialization
+        Map = geemap.Map(
+            center=[40.725, -74.005], 
+            zoom=16, 
+            width='100%', 
+            height='600px'
+        )
+        
+        # Try to access and modify the underlying folium map
+        try:
+            if hasattr(Map, '_map'):
+                Map._map.options['maxZoom'] = 18
+                Map._map.options['minZoom'] = 12
+            elif hasattr(Map, 'default_map'):
+                Map.default_map.options['maxZoom'] = 18
+                Map.default_map.options['minZoom'] = 12
+        except Exception as e:
+            print(f"Could not set zoom limits: {e}")
 
-    # Add base map first
+    # Add base map with error handling
     try:
         Map.add_basemap('CartoDB Positron')
     except:
         try:
             Map.add_basemap('OpenStreetMap')
         except:
-            pass  # Continue without base map if needed
+            pass
 
-    # Clip the tree cover layers to Hudson Square
+    # Your existing layer code...
     tree_year1_clipped = tree_year1.clip(hudson_square)
     tree_year2_clipped = tree_year2.clip(hudson_square)
 
-    # Get actual data ranges for proper visualization
-    try:
-        # Get min/max values for proper scaling
-        stats1 = tree_year1_clipped.reduceRegion(
-            reducer=ee.Reducer.minMax(),
-            geometry=hudson_square,
-            scale=30,
-            bestEffort=True,
-            maxPixels=1e9
-        ).getInfo()
-        
-        stats2 = tree_year2_clipped.reduceRegion(
-            reducer=ee.Reducer.minMax(),
-            geometry=hudson_square,
-            scale=30,
-            bestEffort=True,
-            maxPixels=1e9
-        ).getInfo()
-        
-        print(f"Data range for {year1}: {stats1}")
-        print(f"Data range for {year2}: {stats2}")
-        
-        # Use actual data ranges or defaults
-        min_val1 = stats1.get('tree_cover_min', 0) if stats1 else 0
-        max_val1 = stats1.get('tree_cover_max', 100) if stats1 else 100
-        min_val2 = stats2.get('tree_cover_min', 0) if stats2 else 0
-        max_val2 = stats2.get('tree_cover_max', 100) if stats2 else 100
-        
-    except Exception as e:
-        print(f"Error getting data ranges: {e}")
-        min_val1 = min_val2 = 0
-        max_val1 = max_val2 = 100
-
-    # Robust visualization parameters
+    # Enhanced vis params with better handling of no-data
     vis_params_year1 = {
-        'min': min_val1, 
-        'max': max_val1, 
-        'palette': ['00000000', '#8b5cf6', '#7c3aed'],  # Transparent to purple
+        'min': 0, 
+        'max': 100, 
+        'palette': ['transparent', '#8b5cf6', '#7c3aed'],  # Use 'transparent' instead of hex
         'opacity': 0.7
     }
     
     vis_params_year2 = {
-        'min': min_val2, 
-        'max': max_val2, 
-        'palette': ['00000000', '#22c55e', '#16a34a'],  # Transparent to green
+        'min': 0, 
+        'max': 100, 
+        'palette': ['transparent', '#22c55e', '#16a34a'],  # Use 'transparent' instead of hex
         'opacity': 0.7
     }
 
-    # Add tree cover layers with error handling
+    # Add layers with better error handling
     try:
         Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
     except Exception as e:
         print(f"Error adding {year2} layer: {e}")
+        # Try simplified version
+        try:
+            Map.addLayer(tree_year2_clipped, {'palette': ['white', 'green']}, f'{year2} Tree Cover')
+        except:
+            pass
     
     try:
         Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
     except Exception as e:
         print(f"Error adding {year1} layer: {e}")
+        # Try simplified version
+        try:
+            Map.addLayer(tree_year1_clipped, {'palette': ['white', 'purple']}, f'{year1} Tree Cover')
+        except:
+            pass
     
     # Add boundary
     try:
-        Map.addLayer(hudson_square, {
-            'color': 'red', 
-            'fillColor': 'transparent',
-            'width': 3
-        }, 'Hudson Square Boundary', shown=True)
+        boundary_style = {
+            'color': 'red',
+            'fillOpacity': 0,
+            'weight': 3
+        }
+        Map.addLayer(hudson_square, boundary_style, 'Hudson Square Boundary')
     except Exception as e:
         print(f"Error adding boundary: {e}")
 
-    # Center the map properly
+    # Center the map with zoom limits
     try:
         Map.centerObject(hudson_square, 16)
+        
+        # Ensure zoom is within bounds after centering
+        current_zoom = Map.zoom if hasattr(Map, 'zoom') else 16
+        if current_zoom > 18:
+            Map.zoom = 18
+        elif current_zoom < 12:
+            Map.zoom = 12
+            
     except Exception as e:
         print(f"Error centering map: {e}")
     
@@ -708,6 +706,7 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         print(f"Error adding layer control: {e}")
 
     return Map
+
 
 def main():
     # Initialize session state variables
