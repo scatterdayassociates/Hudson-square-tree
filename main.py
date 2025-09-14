@@ -400,7 +400,7 @@ def authenticate_ee():
         # Method 1: Try local authentication first (for development)
         try:
             ee.Initialize(project=PROJECT_ID)
-            return True, "✅ Google Earth Engine authenticated successfully"
+            return True, " Google Earth Engine authenticated successfully"
         except Exception as local_error:
             pass
         
@@ -413,36 +413,11 @@ def authenticate_ee():
                     key_data=json.dumps(service_account_info)
                 )
                 ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "✅ Google Earth Engine authenticated successfully"
+                return True, "Google Earth Engine authenticated successfully"
         except Exception as secrets_error:
             pass
             
-        # Method 3: Try local service account file
-        if os.path.exists('private-key.json'):
-            try:
-                credentials = ee.ServiceAccountCredentials(None, 'private-key.json')
-                ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "✅ Google Earth Engine authenticated successfully"
-            except Exception as sa_error:
-                pass
-                
-        # Method 4: Try environment variable
-        if 'GOOGLE_APPLICATION_CREDENTIALS' in os.environ:
-            try:
-                credentials_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
-                credentials = ee.ServiceAccountCredentials(None, credentials_path)
-                ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "✅ Google Earth Engine authenticated successfully"
-            except Exception as env_error:
-                pass
-        
-        # Method 5: Try force re-authentication (local only)
-        try:
-            ee.Authenticate()
-            ee.Initialize(project=PROJECT_ID)
-            return True, "✅ Google Earth Engine authenticated successfully"
-        except Exception as auth_error:
-            pass
+        # Method 3: Try local service account fil
         
         # If all methods fail
         return False, """
