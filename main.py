@@ -400,7 +400,7 @@ def authenticate_ee():
         # Method 1: Try local authentication first (for development)
         try:
             ee.Initialize(project=PROJECT_ID)
-            return True, " Google Earth Engine authenticated successfully"
+            return True, "✅ Using existing local Earth Engine authentication"
         except Exception as local_error:
             pass
         
@@ -413,11 +413,36 @@ def authenticate_ee():
                     key_data=json.dumps(service_account_info)
                 )
                 ee.Initialize(credentials, project=PROJECT_ID)
-                return True, "Google Earth Engine authenticated successfully"
+                return True, "✅ Authenticated via Streamlit secrets"
         except Exception as secrets_error:
             pass
             
-        # Method 3: Try local service account fil
+        # Method 3: Try local service account file
+        if os.path.exists('private-key.json'):
+            try:
+                credentials = ee.ServiceAccountCredentials(None, 'private-key.json')
+                ee.Initialize(credentials, project=PROJECT_ID)
+                return True, "✅ Authenticated via local service account (private-key.json)"
+            except Exception as sa_error:
+                pass
+                
+        # Method 4: Try environment variable
+        if 'GOOGLE_APPLICATION_CREDENTIALS' in os.environ:
+            try:
+                credentials_path = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+                credentials = ee.ServiceAccountCredentials(None, credentials_path)
+                ee.Initialize(credentials, project=PROJECT_ID)
+                return True, f"✅ Authenticated via environment variable: {credentials_path}"
+            except Exception as env_error:
+                pass
+        
+        # Method 5: Try force re-authentication (local only)
+        try:
+            ee.Authenticate()
+            ee.Initialize(project=PROJECT_ID)
+            return True, f"✅ Re-authenticated with project: {PROJECT_ID}"
+        except Exception as auth_error:
+            pass
         
         # If all methods fail
         return False, """
@@ -437,7 +462,7 @@ def authenticate_ee():
         return False, f"❌ Authentication failed: {str(e)}"
 
 def get_tree_cover(year):
-    """Fetch tree cover for the given year using NYC land cover data."""
+    """Fetch tree cover for the given year using Sentinel-2 data (June to August)."""
     try:
         hudson_square = ee.Geometry.Rectangle([
             HUDSON_SQUARE_BOUNDS['west'],
@@ -446,71 +471,18 @@ def get_tree_cover(year):
             HUDSON_SQUARE_BOUNDS['north']
         ])
         
-        # Load the appropriate land cover asset based on year
-        if year == 2010:
-            asset_id = 'projects/seventh-tempest-348517/assets/landcover_2010_nyc_05ft_fixed'
-        elif year == 2017:
-            asset_id = 'projects/seventh-tempest-348517/assets/landcover_2017_nyc_05ft_fixed'
-        else:
-            return None, f"No data available for year {year}. Only 2010 and 2017 are supported."
-        
-        # Load the land cover image
-        landcover = ee.Image(asset_id)
-        
-        # Get band names to understand the data structure
-        band_names = landcover.bandNames().getInfo()
-        print(f"Available bands for {year}: {band_names}")  # Debug info
-        
-        # For land cover classification data, we need to identify tree/vegetation classes
-        # Common land cover classification values:
-        # 1 = Water, 2 = Tree Canopy, 3 = Grass/Shrub, 4 = Bare Earth, 5 = Buildings, 6 = Roads
-        
-        # Let's first check what values are actually in the data
-        unique_values = landcover.reduceRegion(
-            reducer=ee.Reducer.frequencyHistogram(),
-            geometry=hudson_square,
-            scale=30,
-            bestEffort=True,
-            maxPixels=1e10
-        ).getInfo()
-        
-        print(f"Unique values in {year} data: {unique_values}")
-        
-        # Try different possible tree canopy class values
-        # Common values: 2, 3, 4, or sometimes 1 for vegetation
-        possible_tree_classes = [1, 2, 3, 4]
-        best_tree_mask = None
-        max_tree_pixels = 0
-        
-        for tree_class in possible_tree_classes:
-            test_mask = landcover.eq(tree_class)
-            test_stats = test_mask.reduceRegion(
-                reducer=ee.Reducer.sum(),
-                geometry=hudson_square,
-                scale=30,
-                bestEffort=True,
-                maxPixels=1e10
-            ).getInfo()
-            
-            # Get the first (and likely only) band value
-            test_sum = list(test_stats.values())[0] if test_stats else 0
-            print(f"Class {tree_class} pixels for {year}: {test_sum}")
-            
-            if test_sum > max_tree_pixels:
-                max_tree_pixels = test_sum
-                best_tree_mask = test_mask.multiply(100)  # Convert to percentage
-        
-        if best_tree_mask is None:
-            print(f"No tree pixels found for {year}, using class 2 as default")
-            best_tree_mask = landcover.eq(2).multiply(100)
-        
-        # Enhance visibility by adding some contrast and ensuring minimum values
-        # This helps with visibility at high zoom levels
-        tree_cover = best_tree_mask.rename('tree_cover')
-        
-        # Add a small buffer to make tree areas more visible
-        tree_cover = tree_cover.focal_max(radius=1, kernelType='circle', units='pixels')
-        
+        sentinel2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
+            .filterDate(f'{year}-06-01', f'{year}-08-31') \
+            .filterBounds(hudson_square) \
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10)) \
+            .median()
+
+        ndvi = sentinel2.normalizedDifference(['B8', 'B4']).rename('NDVI')
+        tree_cover = ndvi.expression(
+            '((NDVI > 0.3) ? (NDVI - 0.3) * 142.857 : 0)',
+            {'NDVI': ndvi}
+        ).rename('tree_cover')
+
         return tree_cover, None
     except Exception as e:
         return None, str(e)
@@ -521,10 +493,6 @@ def calculate_coverage(image, geometry, band_name='tree_cover'):
         return 0.0, "No image data"
 
     try:
-        # Get image info for debugging
-        band_names = image.bandNames().getInfo()
-        print(f"Image bands: {band_names}")
-        
         stats = image.reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=geometry,
@@ -534,13 +502,11 @@ def calculate_coverage(image, geometry, band_name='tree_cover'):
         )
 
         result = stats.get(band_name).getInfo()
-        print(f"Coverage calculation result: {result}")
         return (result if result is not None else 0.0), None
     except Exception as e:
-        print(f"Coverage calculation error: {str(e)}")
         return 0.0, str(e)
 
-def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
+def create_map(tree_2021, tree_2023, cover_2021, cover_2023):
     """Create the interactive map with tree cover layers."""
     hudson_square = ee.Geometry.Rectangle([
         HUDSON_SQUARE_BOUNDS['west'],
@@ -558,43 +524,20 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
     )
 
     # Clip the tree cover layers to Hudson Square
-    tree_year1_clipped = tree_year1.clip(hudson_square)
-    tree_year2_clipped = tree_year2.clip(hudson_square)
+    tree_2021_clipped = tree_2021.clip(hudson_square)
+    tree_2023_clipped = tree_2023.clip(hudson_square)
 
-    # Enhanced visualization parameters for better visibility at all zoom levels
-    vis_params_year1 = {
-        'min': 0, 
-        'max': 100, 
-        'palette': ['white', '#a855f7', '#7c3aed'],
-        'opacity': 0.8
-    }  # Purple gradient
-    
-    vis_params_year2 = {
-        'min': 0, 
-        'max': 100, 
-        'palette': ['white', '#22c55e', '#16a34a'],
-        'opacity': 0.8
-    }  # Green gradient
+    # Visualization parameters - matching the new color scheme
+    vis_params_2021 = {'min': 0, 'max': 100, 'palette': ['white', '#a855f7', '#7c3aed']}  # Purple gradient
+    vis_params_2023 = {'min': 0, 'max': 100, 'palette': ['white', '#22c55e', '#16a34a']}  # Green gradient
 
-    # Add base map layer for context
-    Map.add_basemap('OpenStreetMap')
-    
-    # Add tree cover layers with better visibility
-    Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
-    Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
-    
-    # Add boundary with better visibility
-    Map.addLayer(hudson_square, {
-        'color': 'red', 
-        'fillColor': 'transparent',
-        'width': 3
-    }, 'Hudson Square Boundary', shown=True)
+    # Add layers to map
+    Map.addLayer(tree_2023_clipped, vis_params_2023, '2023 Tree Cover', opacity=0.7)
+    Map.addLayer(tree_2021_clipped, vis_params_2021, '2021 Tree Cover', opacity=0.7)
+    Map.addLayer(hudson_square, {'color': 'red', 'fillColor': 'transparent'}, 'Hudson Square Boundary')
 
-    # Center the map and set appropriate zoom
+    # Center the map
     Map.centerObject(hudson_square, 16)
-    
-    # Add layer control
-    Map.addLayerControl()
 
     return Map
 
@@ -602,14 +545,10 @@ def main():
     # Initialize session state variables
     if 'analysis_run' not in st.session_state:
         st.session_state.analysis_run = False
-    if 'selected_year1' not in st.session_state:
-        st.session_state.selected_year1 = 2010
-    if 'selected_year2' not in st.session_state:
-        st.session_state.selected_year2 = 2017
-    if 'map_created' not in st.session_state:
-        st.session_state.map_created = False
-    if 'map_data' not in st.session_state:
-        st.session_state.map_data = None
+    if 'year1' not in st.session_state:
+        st.session_state.year1 = 2021
+    if 'year2' not in st.session_state:
+        st.session_state.year2 = 2023
     
     # Professional Header with gradient styling
 
@@ -634,13 +573,13 @@ def main():
             st.metric("South", f"{HUDSON_SQUARE_BOUNDS['south']}")
         
         st.markdown("---")
-        st.markdown("**📅 Year Selection**")
+        st.markdown("**📅 Time Range**")
         col1, col2 = st.columns(2)
-        year1 = col1.selectbox("Year 1", [2010, 2017], index=0, key="year1")
-        year2 = col2.selectbox("Year 2", [2010, 2017], index=1, key="year2")
+        year1 = col1.selectbox("Start Year", [2019, 2020, 2021, 2022], index=2, key="start_year")
+        year2 = col2.selectbox("End Year", [2021, 2022, 2023, 2024], index=2, key="end_year")
         
-        if year1 == year2:
-            st.error("Please select different years for comparison!")
+        if year1 >= year2:
+            st.error("End year must be after start year!")
             return
         
         st.markdown("---")
@@ -648,19 +587,15 @@ def main():
         # Analysis button in sidebar
         if st.button("🚀 Run Tree Cover Analysis", type="primary", use_container_width=True):
             st.session_state.analysis_run = True
-            st.session_state.selected_year1 = year1
-            st.session_state.selected_year2 = year2
+            st.session_state.year1 = year1
+            st.session_state.year2 = year2
             st.rerun()
         
         # Reset button to run new analysis
         if st.session_state.analysis_run:
             if st.button("🔄 Run New Analysis", use_container_width=True):
                 st.session_state.analysis_run = False
-                st.session_state.map_created = False
-                st.session_state.map_data = None
                 st.rerun()
-        
-      
     
     # Authentication status with professional styling
     with st.spinner("Authenticating with Google Earth Engine..."):
@@ -682,7 +617,8 @@ def main():
     <div class="status-indicator success">
         <span>✅</span>
         <div>
-            <strong>{auth_message}</strong>
+            <strong>Google Earth Engine authenticated successfully</strong><br>
+            <small>{auth_message}</small>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -708,8 +644,8 @@ def main():
         
         try:
             # Get years from session state
-            year1 = st.session_state.selected_year1
-            year2 = st.session_state.selected_year2
+            year1 = st.session_state.year1
+            year2 = st.session_state.year2
             
             # Fetch tree cover data
             status_text.text(f"Fetching {year1} tree cover data...")
@@ -720,20 +656,12 @@ def main():
                 st.error(f"Error fetching {year1} data: {error1}")
                 return
             
-            if tree_data_1 is None:
-                st.error(f"No tree data returned for {year1}")
-                return
-            
             status_text.text(f"Fetching {year2} tree cover data...")
             progress_bar.progress(40)
             
             tree_data_2, error2 = get_tree_cover(year2)
             if error2:
                 st.error(f"Error fetching {year2} data: {error2}")
-                return
-                
-            if tree_data_2 is None:
-                st.error(f"No tree data returned for {year2}")
                 return
             
             # Calculate coverage
@@ -747,39 +675,18 @@ def main():
                 HUDSON_SQUARE_BOUNDS['north']
             ])
             
-            # Use official NYC Tree Canopy Assessment figures
-            # These are city-wide percentages from the official assessment
-            if year1 == 2010:
-                cover_1 = 21.3  # Official NYC Tree Canopy Assessment 2010
-            elif year1 == 2017:
-                cover_1 = 22.5  # Official NYC Tree Canopy Assessment 2017
-            else:
-                cover_1 = 0.0
-                
-            if year2 == 2010:
-                cover_2 = 21.3  # Official NYC Tree Canopy Assessment 2010
-            elif year2 == 2017:
-                cover_2 = 22.5  # Official NYC Tree Canopy Assessment 2017
-            else:
-                cover_2 = 0.0
+            cover_1, error_calc1 = calculate_coverage(tree_data_1, hudson_square)
+            cover_2, error_calc2 = calculate_coverage(tree_data_2, hudson_square)
             
-            # Debug information
-         
+            if error_calc1 or error_calc2:
+                st.error(f"Coverage calculation errors: {error_calc1}, {error_calc2}")
+                return
             
             # Create visualization
             status_text.text("Creating interactive map...")
             progress_bar.progress(80)
             
-            # Store map data in session state for persistence
-            st.session_state.map_data = {
-                'tree_data_1': tree_data_1,
-                'tree_data_2': tree_data_2,
-                'cover_1': cover_1,
-                'cover_2': cover_2,
-                'year1': year1,
-                'year2': year2
-            }
-            st.session_state.map_created = True
+            map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2)
             
             progress_bar.progress(100)
             status_text.text("Analysis complete!")
@@ -787,7 +694,7 @@ def main():
             # Display results with enhanced styling
             st.markdown("---")
             st.markdown("##  Analysis Results")
-            st.markdown("*Analyzing tree canopy changes in New York City using official NYC Tree Canopy Assessment data*")
+            st.markdown("*Analyzing vegetation changes in Hudson Square, NYC using satellite imagery*")
             
             # Enhanced Metrics with custom styling
             col1, col2, col3 = st.columns(3)
@@ -857,7 +764,7 @@ def main():
             st.markdown("## 🗺️ Interactive Map")
             st.markdown(f"""
             <div class="map-container">
-                <h4>Land cover analysis showing tree coverage changes in Hudson Square area</h4>
+                <h4>Satellite imagery analysis showing tree coverage changes in Hudson Square area</h4>
                 <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <div style="width: 1rem; height: 1rem; background-color: #22c55e; border-radius: 2px;"></div>
@@ -871,8 +778,6 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Create and display the map
-            map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
             map_obj.to_streamlit(height=600)
             
             # Enhanced Methodology Section
@@ -891,10 +796,10 @@ def main():
                 <div class="methodology-card">
                     <h4>📡 Data Source</h4>
                     <div class="main-content">
-                        <p>NYC Tree Canopy Assessment</p>
+                        <p>Sentinel-2 Surface Reflectance (Harmonized)</p>
                     </div>
                     <p class="description">
-                        Official city-wide tree canopy percentages from NYC Parks and Recreation Department
+                        High-resolution satellite imagery for vegetation analysis
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -903,10 +808,10 @@ def main():
                 <div class="methodology-card">
                     <h4>⏰ Time Period</h4>
                     <div class="main-content">
-                        <p>2010 and 2017 Tree Canopy</p>
+                        <p>June-August (Summer Months)</p>
                     </div>
                     <p class="description">
-                        Official NYC Tree Canopy Assessment figures for city-wide analysis
+                        Optimal vegetation detection during peak growing season
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -916,10 +821,10 @@ def main():
                 <div class="methodology-card">
                     <h4>🔧 Processing</h4>
                     <ul>
-                        <li>Official NYC Tree Canopy Assessment data</li>
-                        <li>City-wide tree canopy percentages</li>
-                        <li>2010: 21.3% tree canopy coverage</li>
-                        <li>2017: 22.5% tree canopy coverage</li>
+                        <li>Cloud filtering: < 10% coverage</li>
+                        <li>NDVI calculation: (NIR - Red) / (NIR + Red)</li>
+                        <li>Tree cover threshold: NDVI > 0.3</li>
+                        <li>Spatial resolution: 30m</li>
                     </ul>
                 </div>
                 """, unsafe_allow_html=True)
@@ -928,13 +833,13 @@ def main():
                 <div class="methodology-card">
                     <h4>📍 Study Area</h4>
                     <div class="main-content">
-                        <p>New York City (City-wide)</p>
+                        <p>Hudson Square, Manhattan, NYC</p>
                     </div>
                     <div class="area-info">
-                        <p>Official NYC Tree Canopy Assessment covers all five boroughs</p>
+                        <p>Area: ~{:.0f} m²</p>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """.format(abs(HUDSON_SQUARE_BOUNDS['east'] - HUDSON_SQUARE_BOUNDS['west']) * abs(HUDSON_SQUARE_BOUNDS['north'] - HUDSON_SQUARE_BOUNDS['south']) * 111000 * 111000), unsafe_allow_html=True)
             
             # Analysis summary
             st.markdown(f"""
@@ -942,8 +847,8 @@ def main():
                 <span>📊</span>
                 <div>
                     <strong>Analysis Summary</strong><br>
-                    <small>Tree canopy coverage {change:+.1f}% from {year1} to {year2}. Data from official NYC Tree Canopy Assessment 
-                    conducted by NYC Parks and Recreation Department.</small>
+                    <small>Tree cover {change:+.1f}% from {year1} to {year2}. Analysis performed using Google Earth Engine 
+                    with authenticated Streamlit access for satellite imagery processing and vegetation analysis.</small>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -962,44 +867,7 @@ def main():
             st.error(f"Analysis failed: {str(e)}")
             progress_bar.empty()
             status_text.empty()
-    
-    # Persistent map display - show map even when analysis is complete
-    elif st.session_state.map_created and st.session_state.map_data:
-        st.markdown("---")
-        st.markdown("## 🗺️ Interactive Map")
-        st.markdown("*Map persists for continued exploration*")
-        
-        # Get stored map data
-        map_data = st.session_state.map_data
-        year1 = map_data['year1']
-        year2 = map_data['year2']
-        
-        st.markdown(f"""
-        <div class="map-container">
-            <h4>Land cover analysis showing tree coverage changes in Hudson Square area</h4>
-            <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #22c55e; border-radius: 2px;"></div>
-                    <span>Green: {year2} Tree Cover</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #8b5cf6; border-radius: 2px;"></div>
-                    <span>Purple: {year1} Tree Cover</span>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Recreate and display the map
-        map_obj = create_map(
-            map_data['tree_data_1'], 
-            map_data['tree_data_2'], 
-            map_data['cover_1'], 
-            map_data['cover_2'], 
-            year1, 
-            year2
-        )
-        map_obj.to_streamlit(height=600)
 
 if __name__ == "__main__":
     main()
+
