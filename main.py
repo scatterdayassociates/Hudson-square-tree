@@ -582,17 +582,40 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
     tree_year1_clipped = tree_year1.clip(hudson_square)
     tree_year2_clipped = tree_year2.clip(hudson_square)
 
-    # Visualization parameters - matching the new color scheme
-    vis_params_year1 = {'min': 0, 'max': 100, 'palette': ['white', '#a855f7', '#7c3aed']}  # Purple gradient
-    vis_params_year2 = {'min': 0, 'max': 100, 'palette': ['white', '#22c55e', '#16a34a']}  # Green gradient
+    # Enhanced visualization parameters for better visibility at all zoom levels
+    vis_params_year1 = {
+        'min': 0, 
+        'max': 100, 
+        'palette': ['white', '#a855f7', '#7c3aed'],
+        'opacity': 0.8
+    }  # Purple gradient
+    
+    vis_params_year2 = {
+        'min': 0, 
+        'max': 100, 
+        'palette': ['white', '#22c55e', '#16a34a'],
+        'opacity': 0.8
+    }  # Green gradient
 
-    # Add layers to map
-    Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', opacity=0.7)
-    Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', opacity=0.7)
-    Map.addLayer(hudson_square, {'color': 'red', 'fillColor': 'transparent'}, 'Hudson Square Boundary')
+    # Add base map layer for context
+    Map.add_basemap('OpenStreetMap')
+    
+    # Add tree cover layers with better visibility
+    Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
+    Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
+    
+    # Add boundary with better visibility
+    Map.addLayer(hudson_square, {
+        'color': 'red', 
+        'fillColor': 'transparent',
+        'width': 3
+    }, 'Hudson Square Boundary', shown=True)
 
-    # Center the map
+    # Center the map and set appropriate zoom
     Map.centerObject(hudson_square, 16)
+    
+    # Add layer control
+    Map.addLayerControl()
 
     return Map
 
@@ -680,8 +703,7 @@ def main():
     <div class="status-indicator success">
         <span>✅</span>
         <div>
-            <strong>Google Earth Engine authenticated successfully</strong><br>
-            <small>{auth_message}</small>
+            <strong>{auth_message}</strong>
         </div>
     </div>
     """, unsafe_allow_html=True)
