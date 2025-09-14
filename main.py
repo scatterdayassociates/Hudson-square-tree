@@ -574,11 +574,10 @@ def calculate_coverage(image, geometry, band_name='tree_cover'):
         print(f"Coverage calculation error: {str(e)}")
         return 0.0, str(e)
 
+# Replace your create_map function with this updated version
+
 def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
-    """Create the interactive map using pure Folium with strict zoom control."""
-    import folium
-    from folium.plugins import Fullscreen, LayerControl
-    
+    """Create the interactive map with robust zoom restrictions."""
     hudson_square = ee.Geometry.Rectangle([
         HUDSON_SQUARE_BOUNDS['west'],
         HUDSON_SQUARE_BOUNDS['south'],
@@ -586,129 +585,127 @@ def create_map(tree_year1, tree_year2, cover_year1, cover_year2, year1, year2):
         HUDSON_SQUARE_BOUNDS['north']
     ])
     
-    # Create Folium map with strict zoom control
-    m = folium.Map(
-        location=[40.725, -74.005],
-        zoom_start=16,
-        max_zoom=18,  # Strict maximum zoom
-        min_zoom=12,  # Strict minimum zoom
-        tiles='CartoDB Positron',
-        attr='CartoDB',
-        width='100%',
-        height=600,
-        zoom_control=True,
-        scroll_wheel_zoom=True,
-        dragging=True,
-        touch_zoom=True,
-        double_click_zoom=True,
-        box_zoom=True,
-        keyboard=True
-    )
+    # SOLUTION 1: Use ee_initialize with proper map options
+    try:
+        # Create map with explicit folium parameters
+        import folium
+        from folium.plugins import Fullscreen
+        
+        # Create folium map directly with zoom restrictions
+        folium_map = folium.Map(
+            location=[40.725, -74.005],
+            zoom_start=16,
+            max_zoom=18,
+            min_zoom=12,
+            tiles='CartoDB Positron',
+            attr='CartoDB'
+        )
+        
+        # Convert to geemap Map
+        Map = geemap.Map()
+        Map._map = folium_map
+        
+    except Exception:
+        # Fallback to regular geemap initialization
+        Map = geemap.Map(
+            center=[40.725, -74.005], 
+            zoom=16, 
+            width='100%', 
+            height='600px'
+        )
+        
+        # Try to access and modify the underlying folium map
+        try:
+            if hasattr(Map, '_map'):
+                Map._map.options['maxZoom'] = 18
+                Map._map.options['minZoom'] = 12
+            elif hasattr(Map, 'default_map'):
+                Map.default_map.options['maxZoom'] = 18
+                Map.default_map.options['minZoom'] = 12
+        except Exception as e:
+            print(f"Could not set zoom limits: {e}")
+
+    # Add base map with error handling
+    try:
+        Map.add_basemap('CartoDB Positron')
+    except:
+        try:
+            Map.add_basemap('OpenStreetMap')
+        except:
+            pass
+
+    # Your existing layer code...
+    tree_year1_clipped = tree_year1.clip(hudson_square)
+    tree_year2_clipped = tree_year2.clip(hudson_square)
+
+    # Enhanced vis params with better handling of no-data
+    vis_params_year1 = {
+        'min': 0, 
+        'max': 100, 
+        'palette': ['transparent', '#8b5cf6', '#7c3aed'],  # Use 'transparent' instead of hex
+        'opacity': 0.7
+    }
     
-    # Add fullscreen plugin
-    Fullscreen(
-        position='topright',
-        title='Full Screen',
-        title_cancel='Exit Full Screen',
-        force_separate_button=True
-    ).add_to(m)
+    vis_params_year2 = {
+        'min': 0, 
+        'max': 100, 
+        'palette': ['transparent', '#22c55e', '#16a34a'],  # Use 'transparent' instead of hex
+        'opacity': 0.7
+    }
+
+    # Add layers with better error handling
+    try:
+        Map.addLayer(tree_year2_clipped, vis_params_year2, f'{year2} Tree Cover', shown=True)
+    except Exception as e:
+        print(f"Error adding {year2} layer: {e}")
+        # Try simplified version
+        try:
+            Map.addLayer(tree_year2_clipped, {'palette': ['white', 'green']}, f'{year2} Tree Cover')
+        except:
+            pass
     
-    # Add the study area boundary
-    folium.Rectangle(
-        bounds=[[HUDSON_SQUARE_BOUNDS['south'], HUDSON_SQUARE_BOUNDS['west']], 
-                [HUDSON_SQUARE_BOUNDS['north'], HUDSON_SQUARE_BOUNDS['east']]],
-        color='red',
-        fill=False,
-        weight=3,
-        opacity=0.8,
-        popup='Hudson Square Study Area'
-    ).add_to(m)
+    try:
+        Map.addLayer(tree_year1_clipped, vis_params_year1, f'{year1} Tree Cover', shown=True)
+    except Exception as e:
+        print(f"Error adding {year1} layer: {e}")
+        # Try simplified version
+        try:
+            Map.addLayer(tree_year1_clipped, {'palette': ['white', 'purple']}, f'{year1} Tree Cover')
+        except:
+            pass
     
-    # Add markers with tree cover information
-    folium.Marker(
-        [40.725, -74.005],
-        popup=f"""
-        <div style="font-family: Arial, sans-serif; width: 200px;">
-            <h4 style="margin: 0 0 10px 0; color: #333;">Tree Cover Analysis</h4>
-            <p style="margin: 5px 0;"><strong>{year1}:</strong> {cover_year1:.1f}%</p>
-            <p style="margin: 5px 0;"><strong>{year2}:</strong> {cover_year2:.1f}%</p>
-            <p style="margin: 5px 0;"><strong>Change:</strong> {cover_year2 - cover_year1:+.1f}%</p>
-            <hr style="margin: 10px 0;">
-            <p style="font-size: 12px; color: #666; margin: 0;">
-                Data: NYC Tree Canopy Assessment<br>
-                Resolution: 5ft (1.5m)<br>
-                Max Zoom: Level 18
-            </p>
-        </div>
-        """,
-        icon=folium.Icon(color='green', icon='tree', prefix='fa')
-    ).add_to(m)
+    # Add boundary
+    try:
+        boundary_style = {
+            'color': 'red',
+            'fillOpacity': 0,
+            'weight': 3
+        }
+        Map.addLayer(hudson_square, boundary_style, 'Hudson Square Boundary')
+    except Exception as e:
+        print(f"Error adding boundary: {e}")
+
+    # Center the map with zoom limits
+    try:
+        Map.centerObject(hudson_square, 16)
+        
+        # Ensure zoom is within bounds after centering
+        current_zoom = Map.zoom if hasattr(Map, 'zoom') else 16
+        if current_zoom > 18:
+            Map.zoom = 18
+        elif current_zoom < 12:
+            Map.zoom = 12
+            
+    except Exception as e:
+        print(f"Error centering map: {e}")
     
-    # Add a legend
-    legend_html = f'''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 120px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:14px; padding: 10px;
-                border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2);">
-    <p style="margin: 0 0 5px 0; font-weight: bold;">Tree Cover Legend</p>
-    <p style="margin: 2px 0;"><span style="color: #8b5cf6;">●</span> {year1} Tree Cover</p>
-    <p style="margin: 2px 0;"><span style="color: #22c55e;">●</span> {year2} Tree Cover</p>
-    <p style="margin: 2px 0;"><span style="color: red;">■</span> Study Area</p>
-    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
-        Zoom limited to level 18
-    </p>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    # Add JavaScript to enforce zoom limits more strictly
-    zoom_control_js = """
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            var mapContainer = document.querySelector('.folium-map');
-            if (mapContainer && mapContainer._leaflet_id) {
-                var map = mapContainer._leaflet_map;
-                if (map) {
-                    // Set strict zoom limits
-                    map.setMaxZoom(18);
-                    map.setMinZoom(12);
-                    
-                    // Prevent zoom beyond limits
-                    map.on('zoomend', function() {
-                        if (map.getZoom() > 18) {
-                            map.setZoom(18);
-                        } else if (map.getZoom() < 12) {
-                            map.setZoom(12);
-                        }
-                    });
-                    
-                    // Add zoom level indicator
-                    var zoomControl = L.control({position: 'bottomright'});
-                    zoomControl.onAdd = function(map) {
-                        var div = L.DomUtil.create('div', 'zoom-level-indicator');
-                        div.style.cssText = 'background: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.2);';
-                        div.innerHTML = 'Zoom: ' + map.getZoom();
-                        
-                        map.on('zoomend', function() {
-                            div.innerHTML = 'Zoom: ' + map.getZoom();
-                        });
-                        
-                        return div;
-                    };
-                    zoomControl.addTo(map);
-                    
-                    console.log('Zoom limits enforced: min=12, max=18');
-                }
-            }
-        }, 1000);
-    });
-    </script>
-    """
-    m.get_root().html.add_child(folium.Element(zoom_control_js))
-    
-    return m
+    # Add layer control
+    try:
+        Map.addLayerControl()
+    except Exception as e:
+        print(f"Error adding layer control: {e}")
+
+    return Map
 
 
 def main():
@@ -982,17 +979,15 @@ def main():
                     </div>
                 </div>
                 <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                    <strong>💡 Map Features:</strong> Interactive map with strict zoom control (levels 12-18). Click the tree icon for detailed analysis. 
-                    Use fullscreen mode for better viewing. Zoom level indicator shows current zoom.
+                    <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
+                    Use the layer controls to toggle tree cover layers on/off for better visibility.
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
             # Create and display the map
             map_obj = create_map(tree_data_1, tree_data_2, cover_1, cover_2, year1, year2)
-            # Display Folium map using components
-            import streamlit.components.v1 as components
-            components.html(map_obj._repr_html_(), height=600)
+            map_obj.to_streamlit(height=600)
             
             # Enhanced Methodology Section
             st.markdown("""
@@ -1107,8 +1102,8 @@ def main():
                 </div>
             </div>
             <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                <strong>💡 Map Features:</strong> Interactive map with strict zoom control (levels 12-18). Click the tree icon for detailed analysis. 
-                Use fullscreen mode for better viewing. Zoom level indicator shows current zoom.
+                <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
+                Use the layer controls to toggle tree cover layers on/off for better visibility.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1122,9 +1117,7 @@ def main():
             year1, 
             year2
         )
-        # Display Folium map using components
-        import streamlit.components.v1 as components
-        components.html(map_obj._repr_html_(), height=600)
+        map_obj.to_streamlit(height=600)
 
 if __name__ == "__main__":
     main()
