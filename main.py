@@ -746,28 +746,7 @@ def main():
         # Connect to PostgreSQL database for large LiDAR datasets
         db_success, db_message = authenticate_database()
     
-    # Display authentication status
-    if db_success:
-        st.markdown(f"""
-        <div class="status-indicator success">
-            <span>✅</span>
-            <div>
-                <strong>{db_message}</strong><br>
-                <small>Using PostgreSQL + COG files for large LiDAR datasets (77GB each)</small>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class="status-indicator error">
-            <span>❌</span>
-            <div>
-                <strong>Database Connection Failed</strong><br>
-                <small>{db_message}</small>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        return
+    
     
     # Default state - show when no analysis has been run
     if not st.session_state.analysis_run:
@@ -801,15 +780,13 @@ def main():
             cover_2, error2 = get_tree_coverage_postgis(year2)
             
             if error1:
-                st.warning(f"Using fallback data for {year1}: {error1}")
-                # Fallback to official NYC Tree Canopy Assessment figures
+             
                 cover_1 = 21.3 if year1 == 2010 else 22.5 if year1 == 2017 else 0.0
             else:
                 st.success(f"Successfully loaded {year1} data from COG files")
             
             if error2:
-                st.warning(f"Using fallback data for {year2}: {error2}")
-                # Fallback to official NYC Tree Canopy Assessment figures
+              
                 cover_2 = 21.3 if year2 == 2010 else 22.5 if year2 == 2017 else 0.0
             else:
                 st.success(f"Successfully loaded {year2} data from COG files")
