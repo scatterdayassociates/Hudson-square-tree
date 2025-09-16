@@ -472,13 +472,14 @@ def create_map(cover_year1, cover_year2, year1, year2):
         keyboard=True,  # Enable keyboard navigation
     )
     
-    # Add Google Maps as the base layer
+    # Add Google Maps as the default base layer
     folium.TileLayer(
         tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
         attr='Google Maps',
         name='Google Maps',
         overlay=False,
         control=True,
+        show=True,  # Explicitly set as default/active layer
         max_zoom=22,
         min_zoom=0
     ).add_to(folium_map)
@@ -624,13 +625,14 @@ def create_map(cover_year1, cover_year2, year1, year2):
             icon=folium.Icon(color='green', icon='tree')
         ).add_to(folium_map)
     
-    # Add additional Google Maps layers
+    # Add additional Google Maps layers (not default)
     folium.TileLayer(
         tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
         attr='Google Satellite',
         name='Google Satellite',
         overlay=False,
         control=True,
+        show=False,  # Not default - user can select from layer control
         max_zoom=22,  # High zoom for satellite
         min_zoom=0
     ).add_to(folium_map)
@@ -641,6 +643,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
         name='Google Hybrid',
         overlay=False,
         control=True,
+        show=False,  # Not default - user can select from layer control
         max_zoom=22,
         min_zoom=0
     ).add_to(folium_map)
