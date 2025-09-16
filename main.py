@@ -782,14 +782,11 @@ def main():
             if error1:
              
                 cover_1 = 21.3 if year1 == 2010 else 22.5 if year1 == 2017 else 0.0
-            else:
-                st.success(f"Successfully loaded {year1} data from COG files")
-            
+        
             if error2:
               
                 cover_2 = 21.3 if year2 == 2010 else 22.5 if year2 == 2017 else 0.0
-            else:
-                st.success(f"Successfully loaded {year2} data from COG files")
+      
             
             # Create visualization
             status_text.text("Creating interactive map...")
