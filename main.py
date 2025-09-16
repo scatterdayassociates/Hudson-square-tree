@@ -5,7 +5,7 @@ from folium.plugins import Fullscreen, Draw
 import json
 import os
 from datetime import datetime
-from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB
+from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB, PROJECT_ID
 from postgis_raster import PostGISRasterHandler, get_tree_coverage_postgis, initialize_lidar_datasets
 
 # Page configuration
