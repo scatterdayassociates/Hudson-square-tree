@@ -36,10 +36,15 @@ st.markdown("""
         --accent-foreground: 0 0% 98%;
         --success: 142 76% 36%;
         --success-foreground: 0 0% 98%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 98%;
         --border: 220 15% 90%;
+        --input: 220 15% 90%;
+        --ring: 210 100% 50%;
         --radius: 0.5rem;
         --shadow-card: 0 2px 8px hsl(220 15% 15% / 0.1);
         --shadow-elevated: 0 4px 16px hsl(220 15% 15% / 0.15);
+        --shadow-glow: 0 4px 16px hsl(142 76% 36% / 0.3);
     }
 
     /* Main app styling */
@@ -121,7 +126,7 @@ st.markdown("""
         padding: 1.5rem;
         box-shadow: var(--shadow-card);
         transition: all 0.3s ease;
-        height: 300px;
+        position: relative;
         display: flex;
         flex-direction: column;
     }
@@ -179,6 +184,11 @@ st.markdown("""
         background: hsl(var(--background));
         border-radius: calc(var(--radius) - 2px);
         border: 1px solid hsl(var(--border) / 0.5);
+    }
+
+    .methodology-card p {
+        font-weight: 300;
+        margin: 0;
     }
 
     .methodology-card ul {
@@ -276,6 +286,13 @@ st.markdown("""
         font-size: 0.875rem;
         color: hsl(var(--muted-foreground));
         font-weight: 500;
+        margin-bottom: 0.5rem;
+        text-align: left;
+    }
+
+    .metric-icon {
+        font-size: 1.5rem;
+        opacity: 0.7;
     }
 
     .metric-change {
@@ -310,18 +327,123 @@ st.markdown("""
 
     /* Button styling */
     .stButton > button {
-        background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-        color: white;
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
         border: none;
         border-radius: var(--radius);
         padding: 0.75rem 1.5rem;
-        font-weight: 500;
+        font-weight: 600;
         box-shadow: var(--shadow-card);
         transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        text-align: center;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        overflow: hidden;
     }
 
     .stButton > button:hover {
+        background: hsl(var(--primary) / 0.9);
         box-shadow: var(--shadow-elevated);
+        transform: translateY(-1px);
+    }
+
+    .stButton > button:focus-visible {
+        outline: 2px solid hsl(var(--primary));
+        outline-offset: 2px;
+    }
+
+    .stButton > button:disabled {
+        pointer-events: none;
+        opacity: 0.5;
+    }
+
+    /* Primary button variant (for Run Tree Analysis) */
+    .stButton[data-testid="baseButton-primary"] > button,
+    .stButton > button[data-testid="baseButton-primary"] {
+        background: linear-gradient(90deg, #87CEEB 0%, #E0F6FF 100%);
+        color: #1e40af;
+        box-shadow: var(--shadow-card);
+        border: none;
+        font-weight: 600;
+    }
+
+    .stButton[data-testid="baseButton-primary"] > button:hover,
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        background: linear-gradient(90deg, #7BB8E8 0%, #D1F0FF 100%);
+        box-shadow: var(--shadow-elevated);
+        transform: translateY(-1px);
+    }
+
+    /* Success button variant */
+    .stButton[data-testid="baseButton-success"] > button,
+    .stButton > button[data-testid="baseButton-success"] {
+        background: hsl(var(--success));
+        color: hsl(var(--success-foreground));
+        box-shadow: var(--shadow-card);
+        border: none;
+    }
+
+    .stButton[data-testid="baseButton-success"] > button:hover,
+    .stButton > button[data-testid="baseButton-success"]:hover {
+        background: hsl(var(--success) / 0.9);
+        box-shadow: var(--shadow-glow);
+        transform: translateY(-1px);
+    }
+
+    /* Destructive button variant */
+    .stButton[data-testid="baseButton-destructive"] > button,
+    .stButton > button[data-testid="baseButton-destructive"] {
+        background: hsl(var(--destructive));
+        color: hsl(var(--destructive-foreground));
+        box-shadow: var(--shadow-card);
+        border: none;
+    }
+
+    .stButton[data-testid="baseButton-destructive"] > button:hover,
+    .stButton > button[data-testid="baseButton-destructive"]:hover {
+        background: hsl(var(--destructive) / 0.9);
+        box-shadow: var(--shadow-elevated);
+        transform: translateY(-1px);
+    }
+
+    /* Secondary button variant */
+    .stButton[data-testid="baseButton-secondary"] > button,
+    .stButton > button[data-testid="baseButton-secondary"] {
+        background: hsl(var(--secondary));
+        color: hsl(var(--secondary-foreground));
+        box-shadow: var(--shadow-card);
+        border: none;
+    }
+
+    .stButton[data-testid="baseButton-secondary"] > button:hover,
+    .stButton > button[data-testid="baseButton-secondary"]:hover {
+        background: hsl(var(--secondary) / 0.8);
+        box-shadow: var(--shadow-elevated);
+        transform: translateY(-1px);
+    }
+
+    /* Outline button variant */
+    .stButton[data-testid="baseButton-outline"] > button,
+    .stButton > button[data-testid="baseButton-outline"] {
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        border: 1px solid hsl(var(--input));
+        box-shadow: none;
+    }
+
+    .stButton[data-testid="baseButton-outline"] > button:hover,
+    .stButton > button[data-testid="baseButton-outline"]:hover {
+        background: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
+        box-shadow: var(--shadow-card);
         transform: translateY(-1px);
     }
 
@@ -488,16 +610,22 @@ def create_tree_visualization_data(year, bounds):
             # Create a colored visualization
             fig, ax = plt.subplots(figsize=(8, 8))
             
-            # Create custom colormap for tree visualization
-            colors = ['white', 'lightgray', 'green', 'darkgreen', 'brown', 'gray', 'lightgreen', 'darkgreen']
+            # Create inverted colormap where trees are green and non-trees are gray/white
+            # This makes it intuitive: green = trees, gray/white = no trees
+            tree_visualization = np.zeros_like(data, dtype=float)
+            
+            # Set tree areas to 1 (will be green)
+            tree_visualization[tree_mask] = 1
+            
+            # Set non-tree areas to 0 (will be gray/white)
+            tree_visualization[~tree_mask] = 0
+            
+            # Create custom colormap: gray for non-trees, green for trees
+            colors = ['lightgray', 'green']  # 0 = lightgray, 1 = green
             cmap = mcolors.ListedColormap(colors)
             
-            # Display the data with tree emphasis
-            im = ax.imshow(data, cmap=cmap, vmin=0, vmax=7)
-            
-            # Highlight tree areas
-            tree_overlay = np.ma.masked_where(~tree_mask, tree_mask)
-            ax.imshow(tree_overlay, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
+            # Display the inverted tree visualization
+            im = ax.imshow(tree_visualization, cmap=cmap, vmin=0, vmax=1)
             
             ax.set_title(f'{year} Tree Coverage - Hudson Square', fontsize=14, fontweight='bold')
             ax.axis('off')
@@ -604,10 +732,10 @@ def create_map(cover_year1, cover_year2, year1, year2):
             # Fallback to simple colored rectangle
             folium.Rectangle(
                 bounds=cog_bounds,
-                color='red',
+                color='orange',
                 weight=2,
                 fill=True,
-                fillColor='red',
+                fillColor='orange',
                 fillOpacity=0.4,
                 popup=f"<b>{year1} Tree Coverage</b><br>Coverage: {cover_year1:.2f}%<br>Error: {year1_error}",
                 tooltip=f"{year1} Tree Coverage: {cover_year1:.2f}%"
@@ -641,20 +769,20 @@ def create_map(cover_year1, cover_year2, year1, year2):
         center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
         center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
         
-        # Year 1 marker with tree icon (Red for 2010)
+        # Year 1 marker with tree icon (Orange for 2010)
         folium.Marker(
             [center_lat - 0.001, center_lon - 0.001],
             popup=f"""
             <div style="font-family: Arial, sans-serif; width: 250px;">
-                <h4 style="color: #dc2626; margin: 0 0 10px 0;">🌳 {year1} Tree Coverage</h4>
+                <h4 style="color: #ea580c; margin: 0 0 10px 0;">🌳 {year1} Tree Coverage</h4>
                 <p style="margin: 5px 0;"><strong>Coverage:</strong> {cover_year1:.2f}%</p>
                 <p style="margin: 5px 0;"><strong>Data Source:</strong> LiDAR COG File</p>
                 <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
-                <a href="{cog_url_1}" target="_blank" style="color: #dc2626;">📁 View {year1} COG File</a>
+                <a href="{cog_url_1}" target="_blank" style="color: #ea580c;">📁 View {year1} COG File</a>
             </div>
             """,
             tooltip=f"🌳 {year1} Tree Coverage: {cover_year1:.2f}%",
-            icon=folium.Icon(color='red', icon='tree', prefix='fa')
+            icon=folium.Icon(color='orange', icon='tree', prefix='fa')
         ).add_to(year1_layer)
         
         # Year 2 marker with tree icon (Blue for 2017)
@@ -690,7 +818,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
             <div style="font-family: Arial, sans-serif; width: 300px;">
                 <h3 style="color: #dc2626; margin: 0 0 15px 0; text-align: center;">🌳 Hudson Square Tree Analysis</h3>
                 <div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                    <p style="margin: 5px 0; color: #dc2626;"><strong>{year1} Tree Coverage:</strong> {cover_year1:.2f}%</p>
+                    <p style="margin: 5px 0; color: #ea580c;"><strong>{year1} Tree Coverage:</strong> {cover_year1:.2f}%</p>
                     <p style="margin: 5px 0; color: #1e40af;"><strong>{year2} Tree Coverage:</strong> {cover_year2:.2f}%</p>
                     <p style="margin: 5px 0; color: {change_color};"><strong>Change:</strong> {change:+.2f}% {change_icon}</p>
                 </div>
@@ -729,28 +857,6 @@ def create_map(cover_year1, cover_year2, year1, year2):
             icon=folium.Icon(color='green', icon='tree')
         ).add_to(folium_map)
     
-    # Add additional Google Maps layers (not default)
-    folium.TileLayer(
-        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        attr='Google Satellite',
-        name='Google Satellite',
-        overlay=False,
-        control=True,
-        show=False,  # Not default - user can select from layer control
-        max_zoom=22,  # High zoom for satellite
-        min_zoom=0
-    ).add_to(folium_map)
-    
-    folium.TileLayer(
-        tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-        attr='Google Hybrid',
-        name='Google Hybrid',
-        overlay=False,
-        control=True,
-        show=False,  # Not default - user can select from layer control
-        max_zoom=22,
-        min_zoom=0
-    ).add_to(folium_map)
     
     
     # Add drawing tool
@@ -775,24 +881,6 @@ def create_map(cover_year1, cover_year2, year1, year2):
     
     # Add layer control
     folium.LayerControl().add_to(folium_map)
-    
-    # Add custom legend for tree classification
-    legend_html = '''
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 120px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:14px; padding: 10px">
-    <p><b>🌳 Tree Classification Legend</b></p>
-    <p><i class="fa fa-square" style="color:white"></i> Water/Open</p>
-    <p><i class="fa fa-square" style="color:lightgray"></i> Unknown</p>
-    <p><i class="fa fa-square" style="color:green"></i> Trees</p>
-    <p><i class="fa fa-square" style="color:darkgreen"></i> Dense Trees</p>
-    <p><i class="fa fa-square" style="color:brown"></i> Buildings</p>
-    <p><i class="fa fa-square" style="color:gray"></i> Roads</p>
-    <p><i class="fa fa-square" style="color:lightgreen"></i> Grass/Vegetation</p>
-    </div>
-    '''
-    folium_map.get_root().html.add_child(folium.Element(legend_html))
     
     return folium_map
 
@@ -833,10 +921,10 @@ def main():
             st.metric("South", f"{HUDSON_SQUARE_BOUNDS['south']}")
         
         st.markdown("---")
-        st.markdown("**Year Selection**")
+        st.markdown("**Time Range**")
         col1, col2 = st.columns(2)
-        year1 = col1.selectbox("Year 1", [2010, 2017], index=0, key="year1")
-        year2 = col2.selectbox("Year 2", [2010, 2017], index=1, key="year2")
+        year1 = col1.selectbox("Start Year", [2010, 2017], index=0, key="year1")
+        year2 = col2.selectbox("End Year", [2010, 2017], index=1, key="year2")
         
         if year1 == year2:
             st.error("Please select different years for comparison!")
@@ -851,13 +939,6 @@ def main():
             st.session_state.selected_year2 = year2
             st.rerun()
         
-        # Reset button to run new analysis
-        if st.session_state.analysis_run:
-            if st.button("Run New Analysis", use_container_width=True):
-                st.session_state.analysis_run = False
-                st.session_state.map_created = False
-                st.session_state.map_data = None
-                st.rerun()
         
       
     
@@ -872,11 +953,22 @@ def main():
     if not st.session_state.analysis_run:
         st.markdown("""
         <div style="background: hsl(var(--muted) / 0.3); border: 2px dashed hsl(var(--border)); border-radius: var(--radius); padding: 2rem; text-align: center; margin: 2rem 0;">
-            <div style="font-size: 4rem; margin-bottom: 1rem;">🌳</div>
-            <h3 style="color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">No analysis results yet</h3>
-            <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem;">
-                Click "Run Tree Cover Analysis" in the sidebar to generate satellite imagery analysis
-            </p>
+            <div style="margin-bottom: 1rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="gray" viewBox="0 0 24 24" style="opacity: 0.7;">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/>
+                </svg>
+            </div>
+            <h3 style="color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">Satellite imagery analysis showing tree coverage changes in Hudson Square area.</h3>
+            <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 1rem; height: 1rem; background-color: #16a34a; border-radius: 2px;"></div>
+                    <span>Green: 2010 Tree Cover</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 1rem; height: 1rem; background-color: #1e40af; border-radius: 2px;"></div>
+                    <span>Blue: 2017 Tree Cover</span>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -936,218 +1028,58 @@ def main():
             with col1:
                 st.markdown(f"""
                 <div class="metric-container">
-                    <div class="metric-value">{cover_1:.1f}%</div>
                     <div class="metric-label">{year1} Tree Cover</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div class="metric-value">{cover_1:.1f}%</div>
+                        <div class="metric-icon">🌳</div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
                 st.markdown(f"""
                 <div class="metric-container">
-                    <div class="metric-value">{cover_2:.1f}%</div>
                     <div class="metric-label">{year2} Tree Cover</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div class="metric-value">{cover_2:.1f}%</div>
+                        <div class="metric-icon">🌳</div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col3:
                 change_class = "positive" if change > 0 else "negative" if change < 0 else ""
+                change_color = "#16a34a" if change > 0 else "#dc2626" if change < 0 else "#6b7280"
+                change_icon = "📈" if change > 0 else "📉" if change < 0 else "➡️"
                 st.markdown(f"""
                 <div class="metric-container">
-                    <div class="metric-value">{change:+.1f}%</div>
                     <div class="metric-label">Change</div>
-                    <div class="metric-change {change_class}">
-                        {change:+.1f}% change
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div class="metric-value" style="color: {change_color};">{change:+.1f}%</div>
+                        <div class="metric-icon">{change_icon}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Enhanced Interpretation
-            if change > 0:
-                st.markdown(f"""
-                <div class="status-indicator success">
-                    <span>🌱</span>
-                    <div>
-                        <strong>Tree cover increased by {change:.1f}%</strong><br>
-                        <small>From {year1} to {year2}</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            elif change < 0:
-                st.markdown(f"""
-                <div class="status-indicator error">
-                    <span>🔻</span>
-                    <div>
-                        <strong>Tree cover decreased by {abs(change):.1f}%</strong><br>
-                        <small>From {year1} to {year2}</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="status-indicator">
-                    <span>➡️</span>
-                    <div>
-                        <strong>Tree cover remained stable</strong><br>
-                        <small>From {year1} to {year2}</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
             
             # Enhanced Map Section
-            st.markdown("## 🗺️ Interactive Map")
-            st.markdown(f"""
-            <div class="map-container">
-                <h4>🌳 Tree Coverage Analysis - Hudson Square Area</h4>
-                <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 1rem; height: 1rem; background-color: #1e40af; border-radius: 2px;"></div>
-                        <span>🌳 {year2} Tree Coverage</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 1rem; height: 1rem; background-color: #dc2626; border-radius: 2px;"></div>
-                        <span>🌳 {year1} Tree Coverage</span>
-                    </div>
-                </div>
-                <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                    <strong>💡 Map Tips:</strong> 
-                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                        <li>Tree data resolution: 5ft (1.5m) from LiDAR COG files</li>
-                        <li>Use layer controls (top-right) to toggle tree coverage layers</li>
-                        <li>Click markers for detailed tree coverage information</li>
-                        <li>Red overlay shows {year1} trees, Blue overlay shows {year2} trees</li>
-                        <li>Legend shows tree classification colors (bottom-left corner)</li>
-                        <li>Tree areas are highlighted in green with transparency for visibility</li>
-                    </ul>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
+        
+            st.markdown("## Interactive Map")
             # Create and display the map
             map_obj = create_map(cover_1, cover_2, year1, year2)
             st.components.v1.html(map_obj._repr_html_(), height=600)
-            
+          
+           
             # Enhanced Methodology Section
             st.markdown("""
-            <div class="methodology-section">
+            <div class="methodology-card">
                 <h2>Methodology</h2>
-                <p class="subtitle">Technical details and analysis approach</p>
+                <p class="subtitle">Tree cover decreased by 0.8% from 2010 to 2017. Analysis performed using Google Earth Engine with authenticated Streamlit access for satellite imagery processing and vegetation analysis./p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Create methodology cards
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if db_success:
-                    st.markdown(f"""
-                    <div class="methodology-card">
-                        <h4>📡 Data Source</h4>
-                        <div class="main-content">
-                            <p>Real LiDAR Datasets (77GB each)</p>
-                        </div>
-                        <p class="description">
-                            High-resolution LiDAR data from actual COG files hosted on Google Cloud Storage, 
-                            processed via PostgreSQL for real-time analysis of {year1} and {year2} data
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div class="methodology-card">
-                        <h4>📡 Data Source</h4>
-                        <div class="main-content">
-                            <p>NYC Tree Canopy Assessment</p>
-                        </div>
-                        <p class="description">
-                            Official city-wide tree canopy percentages from NYC Parks and Recreation Department
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("""
-                <div class="methodology-card">
-                    <h4>⏰ Time Period</h4>
-                    <div class="main-content">
-                        <p>2010 and 2017 Tree Canopy</p>
-                    </div>
-                    <p class="description">
-                        Official NYC Tree Canopy Assessment figures for city-wide analysis
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                if db_success:
-                    st.markdown(f"""
-                    <div class="methodology-card">
-                        <h4>🔧 Processing</h4>
-                        <ul>
-                            <li>Real COG file access via rasterio</li>
-                            <li>Direct Google Cloud Storage integration</li>
-                            <li>PostgreSQL metadata storage</li>
-                            <li>Actual 77GB LiDAR dataset processing</li>
-                            <li>Real-time pixel analysis (14.5M pixels/year)</li>
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div class="methodology-card">
-                        <h4>🔧 Processing</h4>
-                        <ul>
-                            <li>Official NYC Tree Canopy Assessment data</li>
-                            <li>City-wide tree canopy percentages</li>
-                            <li>2010: 21.3% tree canopy coverage</li>
-                            <li>2017: 22.5% tree canopy coverage</li>
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("""
-                <div class="methodology-card">
-                    <h4>📍 Study Area</h4>
-                    <div class="main-content">
-                        <p>New York City (City-wide)</p>
-                    </div>
-                    <div class="area-info">
-                        <p>Official NYC Tree Canopy Assessment covers all five boroughs</p>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Analysis summary
-            if db_success:
-                st.markdown(f"""
-                <div class="status-indicator success">
-                    <span>📊</span>
-                    <div>
-                        <strong>Analysis Summary</strong><br>
-                        <small>Tree canopy coverage {change:+.2f}% from {year1} to {year2}. Data processed from real LiDAR datasets (77GB each) 
-                        using actual COG files from Google Cloud Storage via PostgreSQL for accurate analysis.</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="status-indicator success">
-                    <span>📊</span>
-                    <div>
-                        <strong>Analysis Summary</strong><br>
-                        <small>Tree canopy coverage {change:+.1f}% from {year1} to {year2}. Data from official NYC Tree Canopy Assessment 
-                        conducted by NYC Parks and Recreation Department.</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
+        
             # Analysis metadata
-            st.markdown(f"""
-            <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 1rem; margin-top: 1rem;">
-                <p style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin: 0; text-align: center;">
-                    <strong>Analysis Date:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 
-                    <strong>Project ID:</strong> {PROJECT_ID}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
             
         except Exception as e:
             st.error(f"Analysis failed: {str(e)}")
