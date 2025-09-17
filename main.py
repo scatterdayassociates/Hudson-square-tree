@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import folium
 from folium.plugins import Fullscreen, Draw
+from folium import raster_layers
 import json
 import os
 from datetime import datetime
@@ -452,6 +453,71 @@ def get_tree_cover(year):
 
 # Replace your create_map function with this updated version
 
+def create_tree_visualization_data(year, bounds):
+    """Create tree visualization data from COG files"""
+    try:
+        from postgis_raster import get_tree_coverage_postgis
+        import rasterio
+        from rasterio.warp import transform_bounds
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from io import BytesIO
+        import base64
+        
+        # Get the COG URL for this year
+        cog_url = LIDAR_DATASETS.get(str(year))
+        if not cog_url:
+            return None, f"No COG URL found for year {year}"
+        
+        # Read the COG data
+        with rasterio.open(cog_url) as src:
+            # Transform bounds to the raster's CRS
+            raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                           bounds['west'], bounds['south'],
+                                           bounds['east'], bounds['north'])
+            
+            # Read the data for the study area
+            window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+            data = src.read(1, window=window)
+            
+            # Create tree classification visualization
+            # Class 2 = Trees, Class 7 = Grass/Vegetation
+            tree_mask = np.isin(data, [2, 7])
+            
+            # Create a colored visualization
+            fig, ax = plt.subplots(figsize=(8, 8))
+            
+            # Create custom colormap for tree visualization
+            colors = ['white', 'lightgray', 'green', 'darkgreen', 'brown', 'gray', 'lightgreen', 'darkgreen']
+            cmap = mcolors.ListedColormap(colors)
+            
+            # Display the data with tree emphasis
+            im = ax.imshow(data, cmap=cmap, vmin=0, vmax=7)
+            
+            # Highlight tree areas
+            tree_overlay = np.ma.masked_where(~tree_mask, tree_mask)
+            ax.imshow(tree_overlay, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
+            
+            ax.set_title(f'{year} Tree Coverage - Hudson Square', fontsize=14, fontweight='bold')
+            ax.axis('off')
+            
+            # Save to bytes
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            buffer.seek(0)
+            
+            # Convert to base64
+            image_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return f"data:image/png;base64,{image_base64}", None
+            
+    except Exception as e:
+        print(f"Error creating tree visualization for {year}: {e}")
+        return None, str(e)
+
 def create_map(cover_year1, cover_year2, year1, year2):
     """Create the interactive map using PostGIS data and COG files."""
     
@@ -499,15 +565,17 @@ def create_map(cover_year1, cover_year2, year1, year2):
        
     ).add_to(folium_map)
     
-    # Add COG layers as overlays on Google Maps
+    # Add COG layers as actual raster overlays on Google Maps
     # This uses the actual .tif files from Google Cloud Storage
     try:
         # Year 1 COG layer - using actual COG file
         cog_url_1 = LIDAR_DATASETS[str(year1)]
         cog_url_2 = LIDAR_DATASETS[str(year2)]
         
-        # Add .tif overlay layers using WMS-style approach
-        # Create overlay rectangles to represent the COG data extent
+        # Create ImageOverlay layers for the COG files
+        # These will show the actual tree data as raster overlays
+        
+        # Define bounds for the COG data
         cog_bounds = [
             [HUDSON_SQUARE_BOUNDS['south'], HUDSON_SQUARE_BOUNDS['west']],
             [HUDSON_SQUARE_BOUNDS['north'], HUDSON_SQUARE_BOUNDS['east']]
@@ -517,87 +585,123 @@ def create_map(cover_year1, cover_year2, year1, year2):
         year1_layer = folium.FeatureGroup(name=f'{year1} Tree Coverage')
         year2_layer = folium.FeatureGroup(name=f'{year2} Tree Coverage')
         
-        # Year 1 overlay (semi-transparent blue)
-        folium.Rectangle(
-            bounds=cog_bounds,
-            color='blue',
-            weight=2,
-            fill=True,
-            fillColor='blue',
-            fillOpacity=0.4,
-            popup=f"""
-            <b>{year1} Tree Coverage Overlay</b><br>
-            Coverage: {cover_year1:.2f}%<br>
-            Data Source: COG File<br>
-            <a href="{cog_url_1}" target="_blank">View {year1} COG File</a>
-            """,
-            tooltip=f"{year1} Tree Coverage: {cover_year1:.2f}%"
-        ).add_to(year1_layer)
+        # Create tree visualization images
+        year1_image, year1_error = create_tree_visualization_data(year1, HUDSON_SQUARE_BOUNDS)
+        year2_image, year2_error = create_tree_visualization_data(year2, HUDSON_SQUARE_BOUNDS)
         
-        # Year 2 overlay (semi-transparent green)
-        folium.Rectangle(
-            bounds=cog_bounds,
-            color='green',
-            weight=2,
-            fill=True,
-            fillColor='green',
-            fillOpacity=0.4,
-            popup=f"""
-            <b>{year2} Tree Coverage Overlay</b><br>
-            Coverage: {cover_year2:.2f}%<br>
-            Data Source: COG File<br>
-            <a href="{cog_url_2}" target="_blank">View {year2} COG File</a>
-            """,
-            tooltip=f"{year2} Tree Coverage: {cover_year2:.2f}%"
-        ).add_to(year2_layer)
+        # Add ImageOverlay for Year 1 (Red/Orange theme for 2010)
+        if year1_image:
+            year1_overlay = raster_layers.ImageOverlay(
+                image=year1_image,
+                bounds=cog_bounds,
+                opacity=0.7,
+                interactive=True,
+                cross_origin=False,
+                zindex=1
+            )
+            year1_overlay.add_to(year1_layer)
+        else:
+            # Fallback to simple colored rectangle
+            folium.Rectangle(
+                bounds=cog_bounds,
+                color='red',
+                weight=2,
+                fill=True,
+                fillColor='red',
+                fillOpacity=0.4,
+                popup=f"<b>{year1} Tree Coverage</b><br>Coverage: {cover_year1:.2f}%<br>Error: {year1_error}",
+                tooltip=f"{year1} Tree Coverage: {cover_year1:.2f}%"
+            ).add_to(year1_layer)
+        
+        # Add ImageOverlay for Year 2 (Blue theme for 2017)  
+        if year2_image:
+            year2_overlay = raster_layers.ImageOverlay(
+                image=year2_image,
+                bounds=cog_bounds,
+                opacity=0.7,
+                interactive=True,
+                cross_origin=False,
+                zindex=2
+            )
+            year2_overlay.add_to(year2_layer)
+        else:
+            # Fallback to simple colored rectangle
+            folium.Rectangle(
+                bounds=cog_bounds,
+                color='blue',
+                weight=2,
+                fill=True,
+                fillColor='blue',
+                fillOpacity=0.4,
+                popup=f"<b>{year2} Tree Coverage</b><br>Coverage: {cover_year2:.2f}%<br>Error: {year2_error}",
+                tooltip=f"{year2} Tree Coverage: {cover_year2:.2f}%"
+            ).add_to(year2_layer)
         
         # Add year-specific markers to their respective layers
         center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
         center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
         
-        # Year 1 marker
+        # Year 1 marker with tree icon (Red for 2010)
         folium.Marker(
             [center_lat - 0.001, center_lon - 0.001],
             popup=f"""
-            <b>{year1} LiDAR Data</b><br>
-            Tree Coverage: {cover_year1:.2f}%<br>
-            Data Source: COG File<br>
-            <a href="{cog_url_1}" target="_blank">View {year1} COG File</a>
+            <div style="font-family: Arial, sans-serif; width: 250px;">
+                <h4 style="color: #dc2626; margin: 0 0 10px 0;">🌳 {year1} Tree Coverage</h4>
+                <p style="margin: 5px 0;"><strong>Coverage:</strong> {cover_year1:.2f}%</p>
+                <p style="margin: 5px 0;"><strong>Data Source:</strong> LiDAR COG File</p>
+                <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
+                <a href="{cog_url_1}" target="_blank" style="color: #dc2626;">📁 View {year1} COG File</a>
+            </div>
             """,
-            icon=folium.Icon(color='blue', icon='tree', prefix='fa')
+            tooltip=f"🌳 {year1} Tree Coverage: {cover_year1:.2f}%",
+            icon=folium.Icon(color='red', icon='tree', prefix='fa')
         ).add_to(year1_layer)
         
-        # Year 2 marker
+        # Year 2 marker with tree icon (Blue for 2017)
         folium.Marker(
             [center_lat + 0.001, center_lon + 0.001],
             popup=f"""
-            <b>{year2} LiDAR Data</b><br>
-            Tree Coverage: {cover_year2:.2f}%<br>
-            Data Source: COG File<br>
-            <a href="{cog_url_2}" target="_blank">View {year2} COG File</a>
+            <div style="font-family: Arial, sans-serif; width: 250px;">
+                <h4 style="color: #1e40af; margin: 0 0 10px 0;">🌳 {year2} Tree Coverage</h4>
+                <p style="margin: 5px 0;"><strong>Coverage:</strong> {cover_year2:.2f}%</p>
+                <p style="margin: 5px 0;"><strong>Data Source:</strong> LiDAR COG File</p>
+                <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
+                <a href="{cog_url_2}" target="_blank" style="color: #1e40af;">📁 View {year2} COG File</a>
+            </div>
             """,
-            icon=folium.Icon(color='green', icon='tree', prefix='fa')
+            tooltip=f"🌳 {year2} Tree Coverage: {cover_year2:.2f}%",
+            icon=folium.Icon(color='blue', icon='tree', prefix='fa')
         ).add_to(year2_layer)
         
         # Create a comparison layer showing both years
-        comparison_layer = folium.FeatureGroup(name='Comparison View')
+        comparison_layer = folium.FeatureGroup(name='Analysis Summary')
         
         # Add center marker with summary to comparison layer
         center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
         center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
         
+        change = cover_year2 - cover_year1
+        change_icon = '📈' if change > 0 else '📉' if change < 0 else '➡️'
+        change_color = 'green' if change > 0 else 'red' if change < 0 else 'orange'
+        
         folium.Marker(
             [center_lat, center_lon],
             popup=f"""
-            <b>Hudson Square Tree Coverage Analysis</b><br>
-            <b>{year1}:</b> {cover_year1:.2f}%<br>
-            <b>{year2}:</b> {cover_year2:.2f}%<br>
-            <b>Change:</b> {cover_year2 - cover_year1:+.2f}%<br>
-            <br>
-            <b>Data Sources:</b><br>
-            <a href="{cog_url_1}" target="_blank">{year1} COG File</a><br>
-            <a href="{cog_url_2}" target="_blank">{year2} COG File</a>
+            <div style="font-family: Arial, sans-serif; width: 300px;">
+                <h3 style="color: #dc2626; margin: 0 0 15px 0; text-align: center;">🌳 Hudson Square Tree Analysis</h3>
+                <div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 5px 0; color: #dc2626;"><strong>{year1} Tree Coverage:</strong> {cover_year1:.2f}%</p>
+                    <p style="margin: 5px 0; color: #1e40af;"><strong>{year2} Tree Coverage:</strong> {cover_year2:.2f}%</p>
+                    <p style="margin: 5px 0; color: {change_color};"><strong>Change:</strong> {change:+.2f}% {change_icon}</p>
+                </div>
+                <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 5px 0; font-size: 12px;"><strong>Data Sources:</strong></p>
+                    <p style="margin: 5px 0; font-size: 12px;">• <a href="{cog_url_1}" target="_blank">{year1} LiDAR COG</a></p>
+                    <p style="margin: 5px 0; font-size: 12px;">• <a href="{cog_url_2}" target="_blank">{year2} LiDAR COG</a></p>
+                </div>
+            </div>
             """,
+            tooltip=f"🌳 Tree Coverage Analysis: {change:+.2f}% change",
             icon=folium.Icon(color='red', icon='info-sign', prefix='fa')
         ).add_to(comparison_layer)
         
@@ -672,7 +776,23 @@ def create_map(cover_year1, cover_year2, year1, year2):
     # Add layer control
     folium.LayerControl().add_to(folium_map)
     
-
+    # Add custom legend for tree classification
+    legend_html = '''
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 200px; height: 120px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                font-size:14px; padding: 10px">
+    <p><b>🌳 Tree Classification Legend</b></p>
+    <p><i class="fa fa-square" style="color:white"></i> Water/Open</p>
+    <p><i class="fa fa-square" style="color:lightgray"></i> Unknown</p>
+    <p><i class="fa fa-square" style="color:green"></i> Trees</p>
+    <p><i class="fa fa-square" style="color:darkgreen"></i> Dense Trees</p>
+    <p><i class="fa fa-square" style="color:brown"></i> Buildings</p>
+    <p><i class="fa fa-square" style="color:gray"></i> Roads</p>
+    <p><i class="fa fa-square" style="color:lightgreen"></i> Grass/Vegetation</p>
+    </div>
+    '''
+    folium_map.get_root().html.add_child(folium.Element(legend_html))
     
     return folium_map
 
@@ -877,20 +997,27 @@ def main():
             st.markdown("## 🗺️ Interactive Map")
             st.markdown(f"""
             <div class="map-container">
-                <h4>Land cover analysis showing tree coverage changes in Hudson Square area</h4>
+                <h4>🌳 Tree Coverage Analysis - Hudson Square Area</h4>
                 <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 1rem; height: 1rem; background-color: #22c55e; border-radius: 2px;"></div>
-                        <span>Green: {year2} Tree Cover</span>
+                        <div style="width: 1rem; height: 1rem; background-color: #1e40af; border-radius: 2px;"></div>
+                        <span>🌳 {year2} Tree Coverage</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 1rem; height: 1rem; background-color: #8b5cf6; border-radius: 2px;"></div>
-                        <span>Purple: {year1} Tree Cover</span>
+                        <div style="width: 1rem; height: 1rem; background-color: #dc2626; border-radius: 2px;"></div>
+                        <span>🌳 {year1} Tree Coverage</span>
                     </div>
                 </div>
                 <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                    <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
-                    Use the layer controls to toggle tree cover layers on/off for better visibility.
+                    <strong>💡 Map Tips:</strong> 
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>Tree data resolution: 5ft (1.5m) from LiDAR COG files</li>
+                        <li>Use layer controls (top-right) to toggle tree coverage layers</li>
+                        <li>Click markers for detailed tree coverage information</li>
+                        <li>Red overlay shows {year1} trees, Blue overlay shows {year2} trees</li>
+                        <li>Legend shows tree classification colors (bottom-left corner)</li>
+                        <li>Tree areas are highlighted in green with transparency for visibility</li>
+                    </ul>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1040,20 +1167,27 @@ def main():
         
         st.markdown(f"""
         <div class="map-container">
-            <h4>Land cover analysis showing tree coverage changes in Hudson Square area</h4>
+            <h4>🌳 Tree Coverage Analysis - Hudson Square Area</h4>
             <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #22c55e; border-radius: 2px;"></div>
-                    <span>Green: {year2} Tree Cover</span>
+                    <div style="width: 1rem; height: 1rem; background-color: #1e40af; border-radius: 2px;"></div>
+                    <span>🌳 {year2} Tree Coverage</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #8b5cf6; border-radius: 2px;"></div>
-                    <span>Purple: {year1} Tree Cover</span>
+                    <div style="width: 1rem; height: 1rem; background-color: #dc2626; border-radius: 2px;"></div>
+                    <span>🌳 {year1} Tree Coverage</span>
                 </div>
             </div>
             <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
-                <strong>💡 Map Tips:</strong> The data resolution is 5ft (1.5m). Map zoom is limited to level 18 to prevent gray areas. 
-                Use the layer controls to toggle tree cover layers on/off for better visibility.
+                <strong>💡 Map Tips:</strong> 
+                <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                    <li>Tree data resolution: 5ft (1.5m) from LiDAR COG files</li>
+                    <li>Use layer controls (top-right) to toggle tree coverage layers</li>
+                    <li>Click markers for detailed tree coverage information</li>
+                    <li>Blue overlay shows {year1} trees, Green overlay shows {year2} trees</li>
+                    <li>Legend shows tree classification colors (bottom-left corner)</li>
+                    <li>Tree areas are highlighted in green with transparency for visibility</li>
+                </ul>
             </div>
         </div>
         """, unsafe_allow_html=True)
