@@ -525,12 +525,16 @@ st.markdown("""
         background-color: hsl(var(--card));
         border-bottom: 1px solid hsl(var(--border));
         box-shadow: var(--shadow-card);
+        width: 100%;
+        margin: 0;
+        padding: 0;
     }
     
     .header-container {
-        max-width: 1280px;
-        margin: 0 auto;
-        padding: 0 1rem;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        position: relative;
     }
     
     .header-content {
@@ -538,12 +542,28 @@ st.markdown("""
         align-items: center;
         justify-content: space-between;
         height: 4rem;
+        padding: 0;
+        width: 100%;
     }
     
     .header-left {
         display: flex;
         align-items: center;
         gap: 0.75rem;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        left: 1rem;
+    }
+    
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        right: 1rem;
     }
     
     .header-icon {
@@ -609,14 +629,21 @@ st.markdown("""
         gap: 0.375rem;
         padding: 1.5rem;
     }
+    .card-header1 {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        padding: 1.5rem;
+     
+    }
     
     .card-title {
-        font-size: 1.125rem;
-        font-weight: 500;
+        font-size: 1.75rem;
+        font-weight: 600;
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        color: hsl(var(--primary));
+        color: hsl(var(--foreground));
     }
     
     .card-description {
@@ -652,13 +679,13 @@ st.markdown("""
     }
     
     .label {
-        font-size: 0.875rem;
+        font-size: 1.25rem;
         font-weight: 500;
         color: hsl(var(--foreground));
     }
     
     .study-area-text {
-        font-size: 0.75rem;
+        font-size: 1.25rem;
         color: hsl(var(--muted-foreground));
         margin-top: 0.25rem;
     }
@@ -666,6 +693,7 @@ st.markdown("""
     .separator {
         height: 1px;
         background-color: hsl(var(--border));
+        margin: 1rem 0;
     }
     
     .coordinates-section {
@@ -687,7 +715,7 @@ st.markdown("""
     }
     
     .input-label {
-        font-size: 0.75rem;
+        font-size: 0.975rem;
         color: hsl(var(--muted-foreground));
     }
     
@@ -698,7 +726,7 @@ st.markdown("""
         border: 1px solid hsl(var(--input));
         background-color: hsl(var(--background));
         padding: 0.5rem 0.75rem;
-        font-size: 0.75rem;
+        font-size: 1 rem;
         color: hsl(var(--foreground));
         transition: var(--transition-smooth);
     }
@@ -719,7 +747,7 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.875rem;
+        font-size: 1.25rem;
         font-weight: 500;
         color: hsl(var(--foreground));
     }
@@ -728,13 +756,44 @@ st.markdown("""
         color: hsl(var(--foreground));
     }
     
+    .year-selects {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    
+    .year-select {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .select {
+        height: 2rem;
+        width: 100%;
+        border-radius: calc(var(--radius) - 2px);
+        border: 1px solid hsl(var(--input));
+        background-color: hsl(var(--background));
+        padding: 0 0.75rem;
+        font-size: 0.975rem;
+        color: hsl(var(--foreground));
+        cursor: pointer;
+        transition: var(--transition-smooth);
+    }
+    
+    .select:focus {
+        outline: none;
+        border-color: hsl(var(--ring));
+        box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    }
+    
     .analyze-button {
         width: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        background: hsl(var(--primary));
+        background: var(--gradient-hero);
         color: hsl(var(--primary-foreground));
         border: none;
         border-radius: var(--radius);
@@ -742,13 +801,11 @@ st.markdown("""
         font-size: 0.875rem;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: opacity 0.3s ease;
     }
     
     .analyze-button:hover:not(:disabled) {
-        background: hsl(210 100% 45%);
-        box-shadow: var(--shadow-elevated);
-        transform: translateY(-1px);
+        opacity: 0.9;
     }
     
     .analyze-button:disabled {
@@ -842,6 +899,10 @@ st.markdown("""
         box-shadow: var(--shadow-card);
         border-radius: var(--radius);
         border: 1px solid hsl(var(--border));
+        height: 150px !important;
+        display: flex !important;
+        align-items: center !important;
+        margin-bottom: 50px !important;
     }
     
     .result-card-content {
@@ -849,51 +910,65 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: space-between;
+        width: 100%;
+        height: 100%;
     }
     
     .result-card-info {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
+        flex: 1;
     }
     
     .result-card-label {
-        font-size: 0.875rem;
-        color: hsl(var(--muted-foreground));
+        font-size: 0.875rem !important;
+        color: hsl(var(--muted-foreground)) !important;
+        margin: 0 !important;
     }
     
     .result-card-value {
-        font-size: 2.5rem;
-        line-height: 1.1;
-        font-weight: 700;
-        color: hsl(var(--foreground));
+        font-size: 2.5rem !important;
+        line-height: 1.1 !important;
+        font-weight: 700 !important;
+        color: hsl(var(--foreground)) !important;
+        margin: 0 !important;
     }
     
     .result-card-value.success {
-        color: hsl(var(--success));
+        color: hsl(var(--success)) !important;
+    }
+    
+    .result-card-value.destructive {
+        color: hsl(var(--destructive)) !important;
     }
     
     .result-card-trend {
-        font-size: 0.75rem;
-        color: hsl(var(--success));
+        font-size: 0.75rem !important;
+        color: hsl(var(--success)) !important;
         display: flex;
         align-items: center;
         gap: 0.25rem;
         margin-top: 0.25rem;
     }
     
+    .result-card-trend.negative {
+        color: hsl(var(--destructive)) !important;
+    }
+    
     .result-card-icon {
         padding: 0.75rem;
         border-radius: 50%;
+        flex-shrink: 0;
     }
     
     .result-card-icon.accent {
-        background-color: hsl(var(--muted));
-        color: hsl(var(--accent));
+        background-color: hsl(var(--success) / 0.1);
+        color: hsl(var(--success));
     }
     
     .result-card-icon.success {
-        background-color: hsl(var(--muted));
+        background-color: hsl(var(--success) / 0.1);
         color: hsl(var(--success));
     }
     
@@ -912,6 +987,21 @@ st.markdown("""
         box-shadow: var(--shadow-card);
     }
     
+    .map-card .card-header {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .map-card .card-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .map-card {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    
     /* Methodology Card */
     .methodology-card {
         background-color: hsl(var(--card));
@@ -921,8 +1011,23 @@ st.markdown("""
     
     .methodology-text {
         color: hsl(var(--muted-foreground));
+        font-size: 1.6rem;
         font-weight: 300;
+        line-height: 1.5;
         margin: 0;
+    }
+    
+    .methodology-card .card-header {
+        padding: 0 !important;
+    }
+    
+    .methodology-card .card-title {
+        font-size: 1.25rem !important;
+        font-weight: 500 !important;
+    }
+    
+    .methodology-card .card-content {
+        padding: 0 !important;
     }
     
     /* Default Section */
@@ -1414,72 +1519,131 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar with enhanced styling
+    # Sidebar with enhanced styling from script.css
     with st.sidebar:
-        st.markdown(
-            """
-            <div class=\"card-header\" style=\"padding-left:0;padding-right:0;padding-top:0;\">
-                <div class=\"card-title\" style=\"margin-bottom:0.25rem;color:#111;font-size:1.25rem;\">
-                    <svg class=\"search-icon\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">
-                        <circle cx=\"11\" cy=\"11\" r=\"8\"/>
-                        <path d=\"m21 21-4.35-4.35\"/>
-                    </svg>
-                    Analysis Settings
-                </div>
-                <p class=\"card-description\">Configure study parameters</p>
+        # Header section
+        st.markdown("""
+        <div class="card-header">
+            <div class="card-title">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+                Analysis Settings
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <p class="card-description">Configure study parameters</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        st.markdown(
-            """
-            <label class=\"label\" style=\"font-size:1rem;color:#111;font-weight:600;\">Study Area</label>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown("Hudson Square, NYC")
-        st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
+        # Study Area section
+        st.markdown("""
+        <div class="study-area">
+            <label class="label">Study Area</label>
+            <p class="study-area-text">Hudson Square, NYC</p>
+        </div>
+        <div class="separator"></div>
+        """, unsafe_allow_html=True)
         
-        st.markdown(
-            """
-            <label class=\"label\">Coordinates</label>
-            """,
-            unsafe_allow_html=True,
-        )
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("West", f"{HUDSON_SQUARE_BOUNDS['west']}")
-            st.metric("North", f"{HUDSON_SQUARE_BOUNDS['north']}")
-        with col2:
-            st.metric("East", f"{HUDSON_SQUARE_BOUNDS['east']}")
-            st.metric("South", f"{HUDSON_SQUARE_BOUNDS['south']}")
+        # Coordinates section
+        st.markdown("""
+        <div class="coordinates-section">
+            <label class="label">Coordinates</label>
+            <div class="coordinates-grid">
+                <div class="coordinate-input">
+                    <label class="input-label">West</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{west}</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">East</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{east}</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">North</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{north}</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">South</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{south}</div>
+                </div>
+            </div>
+        </div>
+ 
+        """.format(
+            west=HUDSON_SQUARE_BOUNDS['west'],
+            east=HUDSON_SQUARE_BOUNDS['east'],
+            north=HUDSON_SQUARE_BOUNDS['north'],
+            south=HUDSON_SQUARE_BOUNDS['south']
+        ), unsafe_allow_html=True)
         
-        st.markdown(
-            """
-            <div class=\"time-range-label\">
-                <svg class=\"calendar-icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">
-                    <path d=\"M8 2v4\"/>
-                    <path d=\"M16 2v4\"/>
-                    <rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/>
-                    <path d=\"M3 10h18\"/>
+        # Time Range section
+        st.markdown("""
+        <div class="separator"></div>
+        <div class="time-range-section">
+            <div class="time-range-label">
+                <svg class="calendar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 2v4"/>
+                    <path d="M16 2v4"/>
+                    <rect width="18" height="18" x="3" y="4" rx="2"/>
+                    <path d="M3 10h18"/>
                 </svg>
                 Time Range
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div class="year-selects">
+                <div class="year-select">
+                    <label class="input-label">Start Year</label>
+                </div>
+                <div class="year-select">
+                    <label class="input-label">End Year</label>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Streamlit controls (hidden but functional)
         col1, col2 = st.columns(2)
-        year1 = col1.selectbox("Start Year", [2010, 2017], index=0, key="year1")
-        year2 = col2.selectbox("End Year", [2010, 2017], index=1, key="year2")
+        year1 = col1.selectbox("Start Year", [2010, 2017], index=0, key="year1", label_visibility="collapsed")
+        year2 = col2.selectbox("End Year", [2010, 2017], index=1, key="year2", label_visibility="collapsed")
         
         if year1 == year2:
             st.error("Please select different years for comparison!")
             return
         
+        # Analyze Button (positioned right after year selection)
+        st.markdown("""
+        <style>
+        .stButton > button {
+            background: var(--gradient-hero) !important;
+            color: hsl(var(--primary-foreground)) !important;
+            border: none !important;
+            border-radius: var(--radius) !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 0.875rem !important;
+            font-weight: 500 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.5rem !important;
+            width: 100% !important;
+            transition: opacity 0.3s ease !important;
+            position: relative !important;
+        }
+        .stButton > button:hover {
+            opacity: 0.9 !important;
+        }
+        .stButton > button:before {
+            content: "";
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-size: contain;
+            margin-right: 0.5rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
-        # Analysis button in sidebar
-        if st.button(" Run Tree Cover Analysis", type="primary", use_container_width=True):
+        if st.button("Run Tree Cover Analysis", type="primary", use_container_width=True):
             st.session_state.analysis_run = True
             st.session_state.selected_year1 = year1
             st.session_state.selected_year2 = year2
@@ -1644,7 +1808,7 @@ def main():
             with col3:
                 is_positive = change > 0
                 value_class = "success" if is_positive else "destructive" if change < 0 else ""
-                trend_color = "hsl(var(--success))" if is_positive else "hsl(var(--destructive))" if change < 0 else "hsl(var(--muted-foreground))"
+                trend_class = "" if is_positive else "negative" if change < 0 else ""
                 right_chip_class = "success-bg" if is_positive else "destructive-bg" if change < 0 else "accent"
                 st.markdown(f"""
                 <div class="result-card">
@@ -1652,7 +1816,7 @@ def main():
                         <div class="result-card-info">
                             <p class="result-card-label">Change</p>
                             <p class="result-card-value {value_class}">{change:+.1f}%</p>
-                            <p class="result-card-trend" style="color:{trend_color}">
+                            <p class="result-card-trend {trend_class}">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/>
                                     <polyline points="16,7 22,7 22,13"/>
@@ -1676,10 +1840,10 @@ def main():
             # Interactive Map Section
             st.markdown("""
             <div class="card map-card">
-                <div class="card-header">
+                <div class="card-header" style="padding: 1.5rem 1.5rem 1.5rem 1.5rem !important;">
                     <h3 class="card-title">Interactive Map</h3>
                 </div>
-                <div class="card-content">
+                <div class="card-content" style="padding: 1.5rem 2rem 1.5rem 1.5rem !important;">
             """, unsafe_allow_html=True)
             
             # Create and display the map
