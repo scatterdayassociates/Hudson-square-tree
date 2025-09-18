@@ -17,34 +17,48 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS styling inspired by the HTML/CSS design
+# Custom CSS styling - Complete Design System from script.css
 st.markdown("""
 <style>
-    /* Import the same design system from HTML/CSS */
+    /* CSS Variables for Design System */
     :root {
+        /* Colors - White theme with blue accents */
         --background: 0 0% 100%;
         --foreground: 220 15% 15%;
         --card: 0 0% 100%;
         --card-foreground: 220 15% 15%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 220 15% 15%;
         --primary: 210 100% 50%;
         --primary-foreground: 0 0% 98%;
         --secondary: 220 15% 96%;
         --secondary-foreground: 220 15% 15%;
         --muted: 220 15% 96%;
         --muted-foreground: 220 5% 45%;
-        --accent: 280 60% 50%;
+        --accent: 210 100% 50%;
         --accent-foreground: 0 0% 98%;
-        --success: 142 76% 36%;
-        --success-foreground: 0 0% 98%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 98%;
+        --success: 142 76% 36%;
+        --success-foreground: 0 0% 98%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 48 96% 89%;
         --border: 220 15% 90%;
         --input: 220 15% 90%;
         --ring: 210 100% 50%;
         --radius: 0.5rem;
+      
+        /* Gradients */
+        --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(210 100% 60%));
+        --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted)));
+        --gradient-glow: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(210 100% 60% / 0.1));
+      
+        /* Shadows */
         --shadow-card: 0 2px 8px hsl(220 15% 15% / 0.1);
         --shadow-elevated: 0 4px 16px hsl(220 15% 15% / 0.15);
-        --shadow-glow: 0 4px 16px hsl(142 76% 36% / 0.3);
+      
+        /* Animations */
+        --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* Main app styling */
@@ -350,7 +364,7 @@ st.markdown("""
     }
 
     .stButton > button:hover {
-        background: hsl(var(--primary) / 0.9);
+        background: hsl(210 100% 45%);
         box-shadow: var(--shadow-elevated);
         transform: translateY(-1px);
     }
@@ -499,6 +513,454 @@ st.markdown("""
         background-color: hsl(38 92% 50% / 0.1);
         border: 1px solid hsl(38 92% 50% / 0.2);
         border-radius: var(--radius);
+    }
+    
+    /* Header Styles */
+    .header {
+        background-color: hsl(var(--card));
+        border-bottom: 1px solid hsl(var(--border));
+        box-shadow: var(--shadow-card);
+    }
+    
+    .header-container {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .header-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 4rem;
+    }
+    
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .header-icon {
+        padding: 0.5rem;
+        background: hsl(var(--primary) / 0.1);
+        border-radius: var(--radius);
+    }
+    
+    .icon-tree {
+        color: hsl(var(--primary));
+    }
+    
+    .header-text h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: hsl(var(--foreground));
+    }
+    
+    .header-text p {
+        font-size: 0.875rem;
+        color: hsl(var(--muted-foreground));
+    }
+    
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: hsl(var(--success));
+        color: hsl(var(--success-foreground));
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .status-icon {
+        width: 12px;
+        height: 12px;
+    }
+    
+    .activity-icon {
+        color: hsl(var(--muted-foreground));
+    }
+    
+    /* Card Styles */
+    .card {
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+        background-color: hsl(var(--card));
+        color: hsl(var(--card-foreground));
+        box-shadow: var(--shadow-card);
+    }
+    
+    .card-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        padding: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.125rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: hsl(var(--primary));
+    }
+    
+    .card-description {
+        font-size: 0.875rem;
+        color: hsl(var(--muted-foreground));
+    }
+    
+    .card-content {
+        padding: 1.5rem;
+        padding-top: 0;
+    }
+    
+    /* Sidebar Styles */
+    .sidebar-card {
+        background-color: hsl(var(--card));
+        box-shadow: var(--shadow-card);
+    }
+    
+    .search-icon {
+        color: hsl(var(--primary));
+    }
+    
+    .settings-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .study-area {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: hsl(var(--foreground));
+    }
+    
+    .study-area-text {
+        font-size: 0.75rem;
+        color: hsl(var(--muted-foreground));
+        margin-top: 0.25rem;
+    }
+    
+    .separator {
+        height: 1px;
+        background-color: hsl(var(--border));
+    }
+    
+    .coordinates-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .coordinates-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    
+    .coordinate-input {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .input-label {
+        font-size: 0.75rem;
+        color: hsl(var(--muted-foreground));
+    }
+    
+    .input {
+        height: 2rem;
+        width: 100%;
+        border-radius: calc(var(--radius) - 2px);
+        border: 1px solid hsl(var(--input));
+        background-color: hsl(var(--background));
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+        color: hsl(var(--foreground));
+        transition: var(--transition-smooth);
+    }
+    
+    .input:focus {
+        outline: none;
+        border-color: hsl(var(--ring));
+        box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    }
+    
+    .time-range-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .time-range-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: hsl(var(--foreground));
+    }
+    
+    .calendar-icon {
+        color: hsl(var(--foreground));
+    }
+    
+    .analyze-button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+        border: none;
+        border-radius: var(--radius);
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .analyze-button:hover:not(:disabled) {
+        background: hsl(210 100% 45%);
+        box-shadow: var(--shadow-elevated);
+        transform: translateY(-1px);
+    }
+    
+    .analyze-button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    
+    .map-icon {
+        flex-shrink: 0;
+    }
+    
+    /* Status Overview */
+    .status-overview {
+        width: 100%;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .status-indicator {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-radius: var(--radius);
+        border: 1px solid;
+        transition: var(--transition-smooth);
+    }
+    
+    .status-indicator.success {
+        background-color: hsl(var(--success) / 0.1);
+        color: hsl(var(--success));
+        border-color: hsl(var(--success) / 0.2);
+    }
+    
+    .status-indicator-icon {
+        margin-top: 0.125rem;
+        flex-shrink: 0;
+    }
+    
+    .status-indicator-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .status-indicator-title {
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+    
+    .status-indicator-description {
+        font-size: 0.75rem;
+        opacity: 0.8;
+    }
+    
+    /* Results Section */
+    .results-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .results-header {
+        margin-bottom: 1rem;
+    }
+    
+    .results-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: hsl(var(--foreground));
+    }
+    
+    .results-subtitle {
+        color: hsl(var(--muted-foreground));
+    }
+    
+    .results-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    @media (min-width: 768px) {
+        .results-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    
+    .result-card {
+        background-color: hsl(var(--card));
+        box-shadow: var(--shadow-card);
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+    }
+    
+    .result-card-content {
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .result-card-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .result-card-label {
+        font-size: 0.875rem;
+        color: hsl(var(--muted-foreground));
+    }
+    
+    .result-card-value {
+        font-size: 2.5rem;
+        line-height: 1.1;
+        font-weight: 700;
+        color: hsl(var(--foreground));
+    }
+    
+    .result-card-value.success {
+        color: hsl(var(--success));
+    }
+    
+    .result-card-trend {
+        font-size: 0.75rem;
+        color: hsl(var(--success));
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 0.25rem;
+    }
+    
+    .result-card-icon {
+        padding: 0.75rem;
+        border-radius: 50%;
+    }
+    
+    .result-card-icon.accent {
+        background-color: hsl(var(--muted));
+        color: hsl(var(--accent));
+    }
+    
+    .result-card-icon.success {
+        background-color: hsl(var(--muted));
+        color: hsl(var(--success));
+    }
+    
+    .result-card-icon.success-bg {
+        background-color: hsl(var(--success) / 0.1);
+        color: hsl(var(--success));
+    }
+    .result-card-icon.destructive-bg {
+        background-color: hsl(var(--destructive) / 0.1);
+        color: hsl(var(--destructive));
+    }
+    
+    /* Map Card */
+    .map-card {
+        background-color: hsl(var(--card));
+        box-shadow: var(--shadow-card);
+    }
+    
+    /* Methodology Card */
+    .methodology-card {
+        background-color: hsl(var(--card));
+        box-shadow: var(--shadow-card);
+        position: relative;
+    }
+    
+    .methodology-text {
+        color: hsl(var(--muted-foreground));
+        font-weight: 300;
+        margin: 0;
+    }
+    
+    /* Default Section */
+    .default-card {
+        background-color: hsl(var(--card));
+        box-shadow: var(--shadow-card);
+    }
+    
+    .default-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .year-badge {
+        background-color: hsl(var(--secondary));
+        color: hsl(var(--secondary-foreground));
+        padding: 0.25rem 0.5rem;
+        border-radius: calc(var(--radius) - 2px);
+        font-size: 0.75rem;
+    }
+    
+    .default-placeholder {
+        background-color: hsl(var(--muted) / 0.3);
+        border-radius: var(--radius);
+        padding: 2rem;
+        text-align: center;
+        border: 2px dashed hsl(var(--border));
+    }
+    
+    .default-placeholder-icon {
+        color: hsl(var(--muted-foreground));
+        margin: 0 auto 1rem;
+    }
+    
+    .default-placeholder-title {
+        color: hsl(var(--muted-foreground));
+        margin-bottom: 0.5rem;
+    }
+    
+    .default-placeholder-description {
+        font-size: 0.875rem;
+        color: hsl(var(--muted-foreground));
     }
 </style>
 """, unsafe_allow_html=True)
@@ -913,20 +1375,73 @@ def main():
     if 'map_data' not in st.session_state:
         st.session_state.map_data = None
     
-    # Professional Header with gradient styling
-
+    # Professional Header matching the design
+    st.markdown("""
+    <div class="header">
+        <div class="header-container">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="header-icon">
+                        <svg class="icon-tree" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
+                            <path d="M12 22V18"/>
+                        </svg>
+                    </div>
+                    <div class="header-text">
+                        <h1>Tree Cover Analysis</h1>
+                        <p>Hudson Square, NYC</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="status-badge">
+                        <svg class="status-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 12l2 2 4-4"/>
+                            <circle cx="12" cy="12" r="9"/>
+                        </svg>
+                        Authenticated
+                    </div>
+                    <svg class="activity-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sidebar with enhanced styling
     with st.sidebar:
-        st.markdown("#  Analysis Settings")
-        st.markdown("**Configure study parameters**")
+        st.markdown(
+            """
+            <div class=\"card-header\" style=\"padding-left:0;padding-right:0;padding-top:0;\">
+                <div class=\"card-title\" style=\"margin-bottom:0.25rem;\">
+                    <svg class=\"search-icon\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">
+                        <circle cx=\"11\" cy=\"11\" r=\"8\"/>
+                        <path d=\"m21 21-4.35-4.35\"/>
+                    </svg>
+                    Analysis Settings
+                </div>
+                <p class=\"card-description\">Configure study parameters</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         
-        st.markdown("---")
-        st.markdown("**Study Area**")
+        st.markdown(
+            """
+            <label class=\"label\">Study Area</label>
+            """,
+            unsafe_allow_html=True,
+        )
         st.markdown("Hudson Square, NYC")
+        st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
         
-        st.markdown("---")
-        st.markdown("**Coordinates**")
+        st.markdown(
+            """
+            <label class=\"label\">Coordinates</label>
+            """,
+            unsafe_allow_html=True,
+        )
         col1, col2 = st.columns(2)
         with col1:
             st.metric("West", f"{HUDSON_SQUARE_BOUNDS['west']}")
@@ -935,8 +1450,20 @@ def main():
             st.metric("East", f"{HUDSON_SQUARE_BOUNDS['east']}")
             st.metric("South", f"{HUDSON_SQUARE_BOUNDS['south']}")
         
-        st.markdown("---")
-        st.markdown("**Time Range**")
+        st.markdown(
+            """
+            <div class=\"time-range-label\">
+                <svg class=\"calendar-icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">
+                    <path d=\"M8 2v4\"/>
+                    <path d=\"M16 2v4\"/>
+                    <rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/>
+                    <path d=\"M3 10h18\"/>
+                </svg>
+                Time Range
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         col1, col2 = st.columns(2)
         year1 = col1.selectbox("Start Year", [2010, 2017], index=0, key="year1")
         year2 = col2.selectbox("End Year", [2010, 2017], index=1, key="year2")
@@ -945,7 +1472,6 @@ def main():
             st.error("Please select different years for comparison!")
             return
         
-        st.markdown("---")
         
         # Analysis button in sidebar
         if st.button(" Run Tree Cover Analysis", type="primary", use_container_width=True):
@@ -958,30 +1484,50 @@ def main():
       
     
     # Authentication status with professional styling
-    with st.spinner("Connecting to PostgreSQL database..."):
-        # Connect to PostgreSQL database for large LiDAR datasets
-        db_success, db_message = authenticate_database()
+    # Connect to PostgreSQL database for large LiDAR datasets (without spinner)
+    db_success, db_message = authenticate_database()
     
     
     
     # Default state - show when no analysis has been run
     if not st.session_state.analysis_run:
+        # Always show auth status before results (pre-analysis)
         st.markdown("""
-        <div style="background: hsl(var(--muted) / 0.3); border: 2px dashed hsl(var(--border)); border-radius: var(--radius); padding: 2rem; text-align: center; margin: 2rem 0;">
-            <div style="margin-bottom: 1rem;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="gray" viewBox="0 0 24 24" style="opacity: 0.7;">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/>
+        <div class="status-overview">
+            <div class="status-indicator success">
+                <svg class="status-indicator-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 12l2 2 4-4"/>
+                    <circle cx="12" cy="12" r="9"/>
                 </svg>
-            </div>
-            <h3 style="color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">Satellite imagery analysis showing tree coverage changes in Hudson Square area.</h3>
-            <div style="display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; font-size: 0.875rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #16a34a; border-radius: 2px;"></div>
-                    <span>Green: 2010 Tree Cover</span>
+                <div class="status-indicator-content">
+                    <p class="status-indicator-title">Google Earth Engine authenticated successfully</p>
+                    <p class="status-indicator-description">Connection to satellite data services established</p>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="width: 1rem; height: 1rem; background-color: #1e40af; border-radius: 2px;"></div>
-                    <span>Blue: 2017 Tree Cover</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="card default-card">
+            <div class="card-header">
+                <div class="default-header">
+                    <h3 class="card-title">Analysis Results</h3>
+                    <div class="year-badge">2010 - 2017</div>
+                </div>
+                <p class="card-description">
+                    Vegetation coverage analysis and change detection results
+                </p>
+            </div>
+            <div class="card-content">
+                <div class="default-placeholder">
+                    <svg class="default-placeholder-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
+                        <path d="M12 22V18"/>
+                    </svg>
+                    <p class="default-placeholder-title">No analysis results yet</p>
+                    <p class="default-placeholder-description">
+                        Click "Run Tree Cover Analysis" to generate satellite imagery analysis
+                    </p>
                 </div>
             </div>
         </div>
@@ -990,9 +1536,7 @@ def main():
     # Run analysis if button was clicked
     if st.session_state.analysis_run:
         
-        # Create progress bar
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # Remove loading progress UI
         
         try:
             # Get years from session state
@@ -1000,8 +1544,6 @@ def main():
             year2 = st.session_state.selected_year2
             
             # Calculate coverage using PostgreSQL backend
-            status_text.text("Calculating tree coverage from LiDAR data...")
-            progress_bar.progress(30)
             
             cover_1, error1 = get_tree_coverage_postgis(year1)
             cover_2, error2 = get_tree_coverage_postgis(year2)
@@ -1016,8 +1558,6 @@ def main():
       
             
             # Create visualization
-            status_text.text("Creating interactive map...")
-            progress_bar.progress(80)
             
             # Store map data in session state for persistence
             st.session_state.map_data = {
@@ -1028,78 +1568,142 @@ def main():
             }
             st.session_state.map_created = True
             
-            progress_bar.progress(100)
-            status_text.text("Analysis complete!")
+   
             
-            # Display results with enhanced styling
-            st.markdown("---")
-            st.markdown("##  Analysis Results")
-           
+            # Status Overview
+            st.markdown("""
+            <div class="status-overview">
+                <div class="status-indicator success">
+                    <svg class="status-indicator-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="9"/>
+                    </svg>
+                    <div class="status-indicator-content">
+                        <p class="status-indicator-title">Google Earth Engine authenticated successfully</p>
+                        <p class="status-indicator-description">Connection to satellite data services established</p>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Enhanced Metrics with custom styling
+            
+            # Results Section with proper styling (container open)
+            st.markdown("""
+            <div class="results-section">
+                <div class="results-header">
+                    <h2 class="results-title">Analysis Results</h2>
+                    <p class="results-subtitle">Analyzing vegetation changes in Hudson Square, NYC using satellite imagery</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
             col1, col2, col3 = st.columns(3)
             change = cover_2 - cover_1
             
             with col1:
                 st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-label">{year1} Tree Cover</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div class="metric-value">{cover_1:.1f}%</div>
-                        <div class="metric-icon">🌳</div>
+                <div class="result-card">
+                    <div class="result-card-content">
+                        <div class="result-card-info">
+                            <p class="result-card-label">{year1} Tree Cover</p>
+                            <p class="result-card-value">{cover_1:.1f}%</p>
+                        </div>
+                        <div class="result-card-icon accent">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
+                                <path d="M12 22V18"/>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
                 st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-label">{year2} Tree Cover</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div class="metric-value">{cover_2:.1f}%</div>
-                        <div class="metric-icon">🌳</div>
+                <div class="result-card">
+                    <div class="result-card-content">
+                        <div class="result-card-info">
+                            <p class="result-card-label">{year2} Tree Cover</p>
+                            <p class="result-card-value">{cover_2:.1f}%</p>
+                        </div>
+                        <div class="result-card-icon success">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
+                                <path d="M12 22V18"/>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col3:
-                change_class = "positive" if change > 0 else "negative" if change < 0 else ""
-                change_color = "#16a34a" if change > 0 else "#dc2626" if change < 0 else "#6b7280"
-                change_icon = "📈" if change > 0 else "📉" if change < 0 else "➡️"
+                is_positive = change > 0
+                value_class = "success" if is_positive else "destructive" if change < 0 else ""
+                trend_color = "hsl(var(--success))" if is_positive else "hsl(var(--destructive))" if change < 0 else "hsl(var(--muted-foreground))"
+                right_chip_class = "success-bg" if is_positive else "destructive-bg" if change < 0 else "accent"
                 st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-label">Change</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div class="metric-value" style="color: {change_color};">{change:+.1f}%</div>
-                        <div class="metric-icon">{change_icon}</div>
+                <div class="result-card">
+                    <div class="result-card-content">
+                        <div class="result-card-info">
+                            <p class="result-card-label">Change</p>
+                            <p class="result-card-value {value_class}">{change:+.1f}%</p>
+                            <p class="result-card-trend" style="color:{trend_color}">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/>
+                                    <polyline points="16,7 22,7 22,13"/>
+                                </svg>
+                                {abs(change):.1f}%
+                            </p>
+                        </div>
+                        <div class="result-card-icon {right_chip_class}">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/>
+                                <polyline points="16,7 22,7 22,13"/>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
+            # Close container not needed now since we didn’t open results-grid
             
-            # Enhanced Map Section
-        
-            st.markdown("## Interactive Map")
+            
+            # Interactive Map Section
+            st.markdown("""
+            <div class="card map-card">
+                <div class="card-header">
+                    <h3 class="card-title">Interactive Map</h3>
+                </div>
+                <div class="card-content">
+            """, unsafe_allow_html=True)
+            
             # Create and display the map
             map_obj = create_map(cover_1, cover_2, year1, year2)
             st.components.v1.html(map_obj._repr_html_(), height=600)
-          
-           
-            # Enhanced Methodology Section
+            
+            st.markdown("</div></div>", unsafe_allow_html=True)
+            
+            # Methodology Section
             st.markdown("""
-            <div class="methodology-card">
-                <h2>Methodology</h2>
-                <p class="subtitle">Tree cover decreased by 0.8% from 2010 to 2017. Analysis performed using Google Earth Engine with authenticated Streamlit access for satellite imagery processing and vegetation analysis./p>
+            <div class="card methodology-card">
+                <div class="card-header">
+                    <h3 class="card-title">Methodology</h3>
+                </div>
+                <div class="card-content">
+                    <p class="methodology-text">
+                        Tree cover changed by {change:+.1f}% from {year1} to {year2}. Analysis performed using Google Earth Engine 
+                        with authenticated Streamlit access for satellite imagery processing and vegetation analysis.
+                    </p>
+                </div>
             </div>
-            """, unsafe_allow_html=True)
+            """.format(change=change, year1=year1, year2=year2), unsafe_allow_html=True)
             
         
             # Analysis metadata
             
         except Exception as e:
             st.error(f"Analysis failed: {str(e)}")
-            progress_bar.empty()
-            status_text.empty()
+            # No progress elements to clear
     
     # Persistent map display - show map even when analysis is complete
     elif st.session_state.map_created and st.session_state.map_data:
