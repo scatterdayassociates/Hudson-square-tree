@@ -605,27 +605,19 @@ def create_tree_visualization_data(year, bounds):
             
             # Create tree classification visualization
             # Class 2 = Trees, Class 7 = Grass/Vegetation
-            tree_mask = np.isin(data, [2, 7])
+            tree_mask = np.isin(data, [1])
             
             # Create a colored visualization
             fig, ax = plt.subplots(figsize=(8, 8))
             
-            # Create inverted colormap where trees are green and non-trees are gray/white
-            # This makes it intuitive: green = trees, gray/white = no trees
-            tree_visualization = np.zeros_like(data, dtype=float)
+            # First display the original data with a neutral colormap
+            colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
+            cmap_original = mcolors.ListedColormap(colors_original)
+            ax.imshow(data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7)
             
-            # Set tree areas to 1 (will be green)
-            tree_visualization[tree_mask] = 1
-            
-            # Set non-tree areas to 0 (will be gray/white)
-            tree_visualization[~tree_mask] = 0
-            
-            # Create custom colormap: gray for non-trees, green for trees
-            colors = ['lightgray', 'green']  # 0 = lightgray, 1 = green
-            cmap = mcolors.ListedColormap(colors)
-            
-            # Display the inverted tree visualization
-            im = ax.imshow(tree_visualization, cmap=cmap, vmin=0, vmax=1)
+            # Then overlay only the tree areas in green
+            tree_overlay = np.ma.masked_where(~tree_mask, tree_mask)
+            ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1)
             
             ax.set_title(f'{year} Tree Coverage - Hudson Square', fontsize=14, fontweight='bold')
             ax.axis('off')
@@ -878,6 +870,29 @@ def create_map(cover_year1, cover_year2, year1, year2):
         }
     )
     draw.add_to(folium_map)
+    
+    # Add additional Google Maps layers
+    folium.TileLayer(
+        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attr='Google Satellite',
+        name='Google Satellite',
+        overlay=False,
+        control=True,
+        show=False,  # Not default - user can select from layer control
+        max_zoom=22,  # High zoom for satellite
+        min_zoom=0
+    ).add_to(folium_map)
+    
+    folium.TileLayer(
+        tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        attr='Google Hybrid',
+        name='Google Hybrid',
+        overlay=False,
+        control=True,
+        show=False,  # Not default - user can select from layer control
+        max_zoom=22,
+        min_zoom=0
+    ).add_to(folium_map)
     
     # Add layer control
     folium.LayerControl().add_to(folium_map)
