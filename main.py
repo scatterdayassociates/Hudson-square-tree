@@ -104,6 +104,11 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
 
+    /* Typography - match design font across the app */
+    html, body, .stApp, .main, .main * {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
     .status-indicator.success {
         border-color: hsl(var(--success) / 0.2);
         background-color: hsl(var(--success) / 0.1);
@@ -1414,7 +1419,7 @@ def main():
         st.markdown(
             """
             <div class=\"card-header\" style=\"padding-left:0;padding-right:0;padding-top:0;\">
-                <div class=\"card-title\" style=\"margin-bottom:0.25rem;\">
+                <div class=\"card-title\" style=\"margin-bottom:0.25rem;color:#111;font-size:1.25rem;\">
                     <svg class=\"search-icon\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">
                         <circle cx=\"11\" cy=\"11\" r=\"8\"/>
                         <path d=\"m21 21-4.35-4.35\"/>
@@ -1429,7 +1434,7 @@ def main():
         
         st.markdown(
             """
-            <label class=\"label\">Study Area</label>
+            <label class=\"label\" style=\"font-size:1rem;color:#111;font-weight:600;\">Study Area</label>
             """,
             unsafe_allow_html=True,
         )
