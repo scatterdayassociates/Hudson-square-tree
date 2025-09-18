@@ -191,7 +191,7 @@ st.markdown("""
         font-size: 0.95rem;
         font-weight: 600;
         color: hsl(var(--foreground));
-        line-height: 1.4;
+        line-height: 0.4;
     }
 
     .methodology-card .description {
@@ -533,7 +533,7 @@ st.markdown("""
     .header-container {
         width: 100%;
         margin: 0;
-        padding: 0;
+        padding: 0.5rem;
         position: relative;
     }
     
@@ -577,14 +577,18 @@ st.markdown("""
     }
     
     .header-text h1 {
-        font-size: 1.25rem;
+        font-size: 1.35rem;
         font-weight: 600;
         color: hsl(var(--foreground));
+        margin: -0.8rem 0 -0.3rem 0;
+        line-height: 1.2;
     }
     
     .header-text p {
         font-size: 0.875rem;
         color: hsl(var(--muted-foreground));
+        margin: -0.9rem 0 0 0;
+        line-height: 1.2;
     }
     
     .header-right {
@@ -596,10 +600,10 @@ st.markdown("""
     .status-badge {
         display: flex;
         align-items: center;
-        gap: 0.25rem;
+   
         background: hsl(var(--success));
         color: hsl(var(--success-foreground));
-        padding: 0.25rem 0.75rem;
+     
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
@@ -623,7 +627,13 @@ st.markdown("""
         box-shadow: var(--shadow-card);
     }
     
-    .card-header {
+    .card-header2 {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        padding: 1.5rem;
+    }
+    .card-header2 {
         display: flex;
         flex-direction: column;
         gap: 0.375rem;
@@ -676,6 +686,7 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
+        margin-top: 1rem;
     }
     
     .label {
@@ -741,6 +752,8 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
+        padding-top: 1rem;
+        margin-bottom: 1rem;
     }
     
     .time-range-label {
@@ -760,6 +773,7 @@ st.markdown("""
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.75rem;
+        margin-top: 1rem;
     }
     
     .year-select {
@@ -827,8 +841,8 @@ st.markdown("""
     .status-indicator {
         display: flex;
         align-items: flex-start;
-        gap: 0.75rem;
-        padding: 1rem;
+ 
+      
         border-radius: var(--radius);
         border: 1px solid;
         transition: var(--transition-smooth);
@@ -848,7 +862,7 @@ st.markdown("""
     .status-indicator-content {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+   
     }
     
     .status-indicator-title {
@@ -987,13 +1001,13 @@ st.markdown("""
         box-shadow: var(--shadow-card);
     }
     
-    .map-card .card-header {
-        padding: 0 !important;
+    .map-card-header {
+        padding: 0.5rem !important;
         margin: 0 !important;
     }
     
-    .map-card .card-content {
-        padding: 0 !important;
+    .map-card-content {
+        padding: 0.5rem !important;
         margin: 0 !important;
     }
     
@@ -1840,10 +1854,10 @@ def main():
             # Interactive Map Section
             st.markdown("""
             <div class="card map-card">
-                <div class="card-header" style="padding: 1.5rem 1.5rem 1.5rem 1.5rem !important;">
+                <div class="map-card-header">
                     <h3 class="card-title">Interactive Map</h3>
                 </div>
-                <div class="card-content" style="padding: 1.5rem 2rem 1.5rem 1.5rem !important;">
+                
             """, unsafe_allow_html=True)
             
             # Create and display the map
