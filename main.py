@@ -94,9 +94,9 @@ st.markdown("""
     /* Status indicator styling */
     .status-indicator {
         display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 1rem;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.5rem;
         border-radius: var(--radius);
         border: 1px solid hsl(var(--success) / 0.2);
         background-color: hsl(var(--success) / 0.1);
@@ -357,7 +357,7 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
+        gap: 0.75rem;
         white-space: nowrap;
         text-align: center;
         font-size: 0.875rem;
@@ -600,10 +600,10 @@ st.markdown("""
     .status-badge {
         display: flex;
         align-items: center;
-   
+        gap: 0.5rem;
         background: hsl(var(--success));
         color: hsl(var(--success-foreground));
-     
+        padding: 0.15rem 0.5rem;
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
@@ -625,6 +625,20 @@ st.markdown("""
         background-color: hsl(var(--card));
         color: hsl(var(--card-foreground));
         box-shadow: var(--shadow-card);
+        padding: 1.5rem;
+    }
+    .card1 {
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+        background-color: hsl(var(--card));
+        color: hsl(var(--card-foreground));
+        box-shadow: var(--shadow-card);
+        padding-left:1.5rem;
+    }
+    
+    .card-header {
+        padding: 0;
+        margin-bottom: 1rem;
     }
     
     .card-header2 {
@@ -654,16 +668,19 @@ st.markdown("""
         align-items: center;
         gap: 0.5rem;
         color: hsl(var(--foreground));
+        margin: 0;
     }
     
     .card-description {
         font-size: 0.875rem;
         color: hsl(var(--muted-foreground));
+        margin: 0;
+        margin-top: 0.5rem;
     }
     
     .card-content {
-        padding: 1.5rem;
-        padding-top: 0;
+        padding: 0;
+        margin-top: 1rem;
     }
     
     /* Sidebar Styles */
@@ -838,21 +855,6 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    .status-indicator {
-        display: flex;
-        align-items: flex-start;
- 
-      
-        border-radius: var(--radius);
-        border: 1px solid;
-        transition: var(--transition-smooth);
-    }
-    
-    .status-indicator.success {
-        background-color: hsl(var(--success) / 0.1);
-        color: hsl(var(--success));
-        border-color: hsl(var(--success) / 0.2);
-    }
     
     .status-indicator-icon {
         margin-top: 0.125rem;
@@ -862,17 +864,22 @@ st.markdown("""
     .status-indicator-content {
         display: flex;
         flex-direction: column;
+        
    
     }
     
     .status-indicator-title {
         font-weight: 500;
         font-size: 0.875rem;
+        margin: 0.5rem;
+        line-height: 1.2;
     }
     
     .status-indicator-description {
         font-size: 0.75rem;
         opacity: 0.8;
+        margin-top: -0.5rem;
+        margin-bottom: 0;
     }
     
     /* Results Section */
@@ -1002,7 +1009,7 @@ st.markdown("""
     }
     
     .map-card-header {
-        padding: 0.5rem !important;
+        padding: 0 !important;
         margin: 0 !important;
     }
     
@@ -1054,14 +1061,17 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: space-between;
+        padding: 0;
+        margin: 0;
     }
     
     .year-badge {
         background-color: hsl(var(--secondary));
         color: hsl(var(--secondary-foreground));
-        padding: 0.25rem 0.5rem;
+        padding: 0.5rem 1rem;
         border-radius: calc(var(--radius) - 2px);
         font-size: 0.75rem;
+        font-weight: 500;
     }
     
     .default-placeholder {
@@ -1506,7 +1516,7 @@ def main():
             <div class="header-content">
                 <div class="header-left">
                     <div class="header-icon">
-                        <svg class="icon-tree" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="icon-tree" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
                             <path d="M12 22V18"/>
                         </svg>
@@ -1697,9 +1707,11 @@ def main():
                     <h3 class="card-title">Analysis Results</h3>
                     <div class="year-badge">2010 - 2017</div>
                 </div>
+                <div class="default-header">
                 <p class="card-description">
                     Vegetation coverage analysis and change detection results
                 </p>
+                </div>
             </div>
             <div class="card-content">
                 <div class="default-placeholder">
@@ -1853,7 +1865,7 @@ def main():
             
             # Interactive Map Section
             st.markdown("""
-            <div class="card map-card">
+            <div class="card1 map-card">
                 <div class="map-card-header">
                     <h3 class="card-title">Interactive Map</h3>
                 </div>
