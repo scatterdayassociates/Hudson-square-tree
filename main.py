@@ -577,15 +577,15 @@ st.markdown("""
     }
     
     .header-text h1 {
-        font-size: 1.35rem;
+        font-size: 1.5rem;
         font-weight: 600;
         color: hsl(var(--foreground));
-        margin: -0.8rem 0 -0.3rem 0;
+        margin: -1.3rem 0 -0.3rem 0;
         line-height: 1.2;
     }
     
     .header-text p {
-        font-size: 0.875rem;
+        font-size: 1rem;
         color: hsl(var(--muted-foreground));
         margin: -0.9rem 0 0 0;
         line-height: 1.2;
