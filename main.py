@@ -94,14 +94,12 @@ st.markdown("""
     /* Status indicator styling */
     .status-indicator {
         display: flex;
-        align-items: flex-start;
-        gap: 0.5rem;
-        padding: 0.5rem;
-        border-radius: var(--radius);
-        border: 1px solid hsl(var(--success) / 0.2);
-        background-color: hsl(var(--success) / 0.1);
-        color: hsl(var(--success));
-        margin-bottom: 1.5rem;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: var(--radius);
+    border: 1px solid;
+    transition: var(--transition-smooth);
     }
 
     /* Typography - match design font across the app */
@@ -120,6 +118,10 @@ st.markdown("""
         background-color: hsl(0 84% 60% / 0.1);
         color: hsl(0 84% 60%);
     }
+    .card-contentMe {
+    padding: 1.5rem;
+    padding-top: 0;
+  }
 
     /* Metrics styling */
     .metric-container {
@@ -137,156 +139,20 @@ st.markdown("""
         transform: translateY(-2px);
     }
 
-    /* Methodology cards styling */
-    .methodology-card {
-        background: hsl(var(--card));
-        border: 1px solid hsl(var(--border));
-        border-radius: var(--radius);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-card);
-        transition: all 0.3s ease;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-    }
+    
+    .card-titleMe {
+    font-size: 0.35rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: hsl(var(--primary));
+  }
+   
 
-    .methodology-card:hover {
-        box-shadow: var(--shadow-elevated);
-        transform: translateY(-2px);
-    }
+  
 
-    .methodology-card h4 {
-        color: hsl(var(--primary));
-        margin-bottom: 1.25rem;
-        font-size: 1.1rem;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 2px solid hsl(var(--primary) / 0.1);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .methodology-card h4::before {
-        content: '';
-        width: 4px;
-        height: 20px;
-        background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-        border-radius: 2px;
-        flex-shrink: 0;
-    }
-
-    .methodology-card .main-content {
-        margin-bottom: 1rem;
-        padding: 0.75rem;
-        background: hsl(var(--muted) / 0.3);
-        border-radius: calc(var(--radius) - 2px);
-        border-left: 3px solid hsl(var(--primary));
-    }
-
-    .methodology-card .main-content p {
-        margin: 0;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: hsl(var(--foreground));
-        line-height: 0.4;
-    }
-
-    .methodology-card .description {
-        font-size: 0.875rem;
-        color: hsl(var(--muted-foreground));
-        line-height: 1.5;
-        margin: 0;
-        padding: 0.5rem 0.75rem;
-        background: hsl(var(--background));
-        border-radius: calc(var(--radius) - 2px);
-        border: 1px solid hsl(var(--border) / 0.5);
-    }
-
-    .methodology-card p {
-        font-weight: 300;
-        margin: 0;
-    }
-
-    .methodology-card ul {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        background: hsl(var(--muted) / 0.2);
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.75rem;
-    }
-
-    .methodology-card li {
-        margin-bottom: 0.5rem;
-        font-size: 0.875rem;
-        color: hsl(var(--foreground));
-        line-height: 1.5;
-        padding-left: 1.5rem;
-        position: relative;
-    }
-
-    .methodology-card li:last-child {
-        margin-bottom: 0;
-    }
-
-    .methodology-card li::before {
-        content: '✓';
-        position: absolute;
-        left: 0;
-        top: 0;
-        color: hsl(var(--success));
-        font-weight: bold;
-        font-size: 0.75rem;
-    }
-
-    .methodology-card .area-info {
-        background: linear-gradient(135deg, hsl(var(--primary) / 0.05), hsl(var(--accent) / 0.05));
-        border: 1px solid hsl(var(--primary) / 0.2);
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.75rem;
-        margin-top: 0.5rem;
-    }
-
-    .methodology-card .area-info p {
-        margin: 0;
-        font-size: 0.875rem;
-        color: hsl(var(--muted-foreground));
-        text-align: center;
-        font-weight: 500;
-    }
-
-    /* Methodology section styling */
-    .methodology-section {
-        margin-top: 2rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .methodology-section h2 {
-        color: hsl(var(--foreground));
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        margin-top: 0;
-    }
-
-    .methodology-section .subtitle {
-        color: hsl(var(--muted-foreground));
-        font-style: italic;
-        font-size: 0.875rem;
-        margin-bottom: 1.5rem;
-        margin-top: 0;
-    }
-
-    /* Grid spacing for methodology cards */
-    .methodology-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
+   
 
     @media (max-width: 768px) {
         .methodology-grid {
@@ -635,12 +501,27 @@ st.markdown("""
         box-shadow: var(--shadow-card);
         padding-left:1.5rem;
     }
+    .cardMe {
+        border-radius: var(--radius);
+        border: 1px solid hsl(var(--border));
+        background-color: hsl(var(--card));
+        color: hsl(var(--card-foreground));
+        box-shadow: var(--shadow-card);
+    }
     
     .card-header {
         padding: 0;
         margin-bottom: 1rem;
     }
-    
+    .card-headerMe {
+     display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding-top: 1rem;
+    padding-left: 1.25rem;
+    padding-bottom: 0;
+     }
+
     .card-header2 {
         display: flex;
         flex-direction: column;
@@ -853,6 +734,7 @@ st.markdown("""
         width: 100%;
         margin-top: 1rem;
         margin-bottom: 1rem;
+
     }
     
     
@@ -864,12 +746,13 @@ st.markdown("""
     .status-indicator-content {
         display: flex;
         flex-direction: column;
+        gap: 0.25rem;
         
    
     }
     
     .status-indicator-title {
-        font-weight: 500;
+        font-weight: 600;
         font-size: 0.875rem;
         margin: 0.5rem;
         line-height: 1.2;
@@ -1027,28 +910,10 @@ st.markdown("""
     .methodology-card {
         background-color: hsl(var(--card));
         box-shadow: var(--shadow-card);
-        position: relative;
     }
     
     .methodology-text {
         color: hsl(var(--muted-foreground));
-        font-size: 1.6rem;
-        font-weight: 300;
-        line-height: 1.5;
-        margin: 0;
-    }
-    
-    .methodology-card .card-header {
-        padding: 0 !important;
-    }
-    
-    .methodology-card .card-title {
-        font-size: 1.25rem !important;
-        font-weight: 500 !important;
-    }
-    
-    .methodology-card .card-content {
-        padding: 0 !important;
     }
     
     /* Default Section */
@@ -1689,9 +1554,9 @@ def main():
         <div class="status-overview">
             <div class="status-indicator success">
                 <svg class="status-indicator-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 12l2 2 4-4"/>
-                    <circle cx="12" cy="12" r="9"/>
-                </svg>
+                                <path d="M9 12l2 2 4-4"/>
+                                <circle cx="12" cy="12" r="9"/>
+                            </svg>
                 <div class="status-indicator-content">
                     <p class="status-indicator-title">Google Earth Engine authenticated successfully</p>
                     <p class="status-indicator-description">Connection to satellite data services established</p>
@@ -1880,11 +1745,11 @@ def main():
             
             # Methodology Section
             st.markdown("""
-            <div class="card methodology-card">
-                <div class="card-header">
-                    <h3 class="card-title">Methodology</h3>
+            <div class="cardMe methodology-card">
+                <div class="card-headerMe">
+                    <h4 class="card-titleMe">Methodology</h3>
                 </div>
-                <div class="card-content">
+                <div class="card-contentMe">
                     <p class="methodology-text">
                         Tree cover changed by {change:+.1f}% from {year1} to {year2}. Analysis performed using Google Earth Engine 
                         with authenticated Streamlit access for satellite imagery processing and vegetation analysis.
