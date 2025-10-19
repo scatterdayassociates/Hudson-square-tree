@@ -49,7 +49,7 @@ class PostGISRasterHandler:
             self.connection.close()
     
     def create_raster_table(self, table_name: str) -> bool:
-        """Create a raster table for storing metadata"""
+        """Create a raster table for storing metadata and pixel data"""
         try:
             create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
@@ -71,6 +71,36 @@ class PostGISRasterHandler:
             
         except Exception as e:
             print(f"❌ Failed to create raster table: {e}")
+            return False
+    
+    def create_pixel_cache_table(self) -> bool:
+        """Create a table to cache pixel data from COG files"""
+        try:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS pixel_cache (
+                id SERIAL PRIMARY KEY,
+                year INTEGER NOT NULL,
+                pixel_data BYTEA NOT NULL,
+                data_shape VARCHAR(50),
+                bounds_type VARCHAR(20),
+                bounds_data TEXT,
+                total_pixels BIGINT,
+                tree_pixels BIGINT,
+                coverage_percent FLOAT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(year, bounds_type)
+            );
+            
+            CREATE INDEX IF NOT EXISTS pixel_cache_year_idx ON pixel_cache(year);
+            """
+            
+            self.cursor.execute(create_table_sql)
+            self.connection.commit()
+            print(f"✅ Created pixel cache table")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to create pixel cache table: {e}")
             return False
     
     def register_cloud_raster(self, year: int, url: str) -> bool:
@@ -250,6 +280,120 @@ class PostGISRasterHandler:
             else:
                 return 0.0, str(e)
     
+    def cache_pixel_data(self, year: int, bounds: Dict[str, Any]) -> bool:
+        """Cache pixel data from COG file to database for fast access"""
+        try:
+            # Check if data is already cached
+            bounds_type = bounds.get('type', 'rectangle')
+            
+            check_sql = """
+            SELECT id FROM pixel_cache 
+            WHERE year = %s AND bounds_type = %s
+            """
+            self.cursor.execute(check_sql, (year, bounds_type))
+            
+            if self.cursor.fetchone():
+                print(f"✅ Pixel data for year {year} already cached")
+                return True
+            
+            # Read pixel data from COG file
+            print(f"📥 Caching pixel data for year {year} from COG file...")
+            data = self.extract_region_data(year, bounds)
+            
+            if data is None:
+                print(f"❌ No data to cache for year {year}")
+                return False
+            
+            # Calculate statistics
+            tree_classes = [1]  # Tree and vegetation
+            tree_mask = np.isin(data, tree_classes)
+            total_pixels = int(np.sum(data > 0))
+            tree_pixels = int(np.sum(tree_mask))
+            coverage = (tree_pixels / total_pixels * 100) if total_pixels > 0 else 0.0
+            
+            # Compress and store pixel data
+            import zlib
+            compressed_data = zlib.compress(data.tobytes())
+            
+            insert_sql = """
+            INSERT INTO pixel_cache 
+            (year, pixel_data, data_shape, bounds_type, bounds_data, 
+             total_pixels, tree_pixels, coverage_percent)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (year, bounds_type) DO UPDATE SET
+                pixel_data = EXCLUDED.pixel_data,
+                data_shape = EXCLUDED.data_shape,
+                bounds_data = EXCLUDED.bounds_data,
+                total_pixels = EXCLUDED.total_pixels,
+                tree_pixels = EXCLUDED.tree_pixels,
+                coverage_percent = EXCLUDED.coverage_percent,
+                created_at = CURRENT_TIMESTAMP
+            """
+            
+            self.cursor.execute(insert_sql, (
+                year,
+                compressed_data,
+                str(data.shape),
+                bounds_type,
+                json.dumps(bounds),
+                total_pixels,
+                tree_pixels,
+                coverage
+            ))
+            self.connection.commit()
+            
+            print(f"✅ Cached {data.size} pixels for year {year} ({coverage:.2f}% tree coverage)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to cache pixel data: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def get_cached_pixel_data(self, year: int, bounds_type: str = 'polygon') -> Optional[Tuple[np.ndarray, Dict[str, Any]]]:
+        """Retrieve cached pixel data from database"""
+        try:
+            select_sql = """
+            SELECT pixel_data, data_shape, bounds_data, total_pixels, tree_pixels, coverage_percent
+            FROM pixel_cache
+            WHERE year = %s AND bounds_type = %s
+            """
+            
+            self.cursor.execute(select_sql, (year, bounds_type))
+            result = self.cursor.fetchone()
+            
+            if not result:
+                return None
+            
+            # Decompress pixel data
+            import zlib
+            decompressed = zlib.decompress(result['pixel_data'])
+            
+            # Parse shape
+            shape_str = result['data_shape'].strip('()').split(',')
+            shape = tuple(int(s.strip()) for s in shape_str)
+            
+            # Reconstruct numpy array
+            data = np.frombuffer(decompressed, dtype=np.uint8).reshape(shape)
+            
+            # Return data and metadata
+            metadata = {
+                'total_pixels': result['total_pixels'],
+                'tree_pixels': result['tree_pixels'],
+                'coverage_percent': result['coverage_percent'],
+                'bounds_data': json.loads(result['bounds_data'])
+            }
+            
+            print(f"✅ Retrieved cached pixel data for year {year}: {data.shape}")
+            return data, metadata
+            
+        except Exception as e:
+            print(f"❌ Failed to retrieve cached pixel data: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
     def get_raster_tile(self, year: int, bounds: Dict[str, float], 
                        width: int = 512, height: int = 512) -> Optional[bytes]:
         """Get a raster tile as PNG/JPEG for web display"""
@@ -297,7 +441,7 @@ class PostGISRasterHandler:
             return None
 
 def initialize_lidar_datasets() -> bool:
-    """Initialize and register all LiDAR datasets"""
+    """Initialize and register all LiDAR datasets, cache pixel data"""
     handler = PostGISRasterHandler()
     
     if not handler.connect():
@@ -305,6 +449,10 @@ def initialize_lidar_datasets() -> bool:
     
     try:
         success = True
+        
+        # Create pixel cache table
+        if not handler.create_pixel_cache_table():
+            print("⚠️ Could not create pixel cache table")
         
         # Register 2010 dataset
         if not handler.register_cloud_raster(2010, LIDAR_DATASETS["2010"]):
@@ -314,27 +462,55 @@ def initialize_lidar_datasets() -> bool:
         if not handler.register_cloud_raster(2017, LIDAR_DATASETS["2017"]):
             success = False
         
+        # Cache pixel data for both years (only done once)
+        print("📥 Initializing pixel data cache...")
+        for year in [2010, 2017]:
+            if not handler.cache_pixel_data(year, HUDSON_SQUARE_BOUNDS):
+                print(f"⚠️ Could not cache pixel data for {year}, will read from COG on demand")
+        
         return success
         
     finally:
         handler.disconnect()
 
 def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
-    """Get tree coverage using direct COG file access (no database needed)"""
+    """Get tree coverage using cached pixel data (fast) or COG file (slow fallback)"""
     try:
         from config import LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS
-        import rasterio
-        from rasterio.warp import transform_bounds
         import numpy as np
         
+        # Try to get cached data first (FAST)
+        handler = PostGISRasterHandler()
+        if handler.connect():
+            try:
+                bounds_type = HUDSON_SQUARE_BOUNDS.get('type', 'rectangle')
+                cached_result = handler.get_cached_pixel_data(year, bounds_type)
+                
+                if cached_result:
+                    data, metadata = cached_result
+                    coverage = metadata['coverage_percent']
+                    print(f"⚡ Using cached pixel data for {year}: {coverage:.2f}%")
+                    handler.disconnect()
+                    return coverage, None
+                else:
+                    print(f"⚠️ No cached data found for {year}, falling back to COG file...")
+                    handler.disconnect()
+            except Exception as cache_error:
+                print(f"⚠️ Cache lookup failed: {cache_error}, falling back to COG file...")
+                handler.disconnect()
+        
+        # Fallback to COG file if cache miss (SLOW - only happens once)
         cog_url = LIDAR_DATASETS.get(str(year))
         if not cog_url:
             return 0.0, f"No COG URL found for year {year}"
         
-        print(f"🔍 Accessing COG file directly: {cog_url}")
+        print(f"🔍 Reading from COG file (this will be cached): {cog_url}")
         
-        # Add headers to avoid 403 errors with timeout
+        # Add headers to avoid 403 errors
+        import rasterio
         import rasterio.session
+        from rasterio.warp import transform_bounds
+        
         session = rasterio.session.AWSSession(
             aws_access_key_id=None,
             aws_secret_access_key=None,
@@ -345,14 +521,7 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
             aws_unsigned=True
         )
         
-        # Set timeouts and use overviews for faster loading
-        with rasterio.Env(
-            session=session,
-            GDAL_HTTP_TIMEOUT=30,
-            GDAL_HTTP_CONNECTTIMEOUT=10,
-            CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif',
-            GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR'
-        ):
+        with rasterio.Env(session=session):
             with rasterio.open(cog_url) as src:
                 # Handle polygon masking for accurate tree coverage
                 if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
@@ -386,7 +555,7 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
                 print(f"✅ Successfully read {data.shape} pixels from COG file")
                 
                 # Apply tree classification
-                tree_classes = [2, 7]  # Tree (2) and Grass/Vegetation (7)
+                tree_classes = [1]  # Tree (2) and Grass/Vegetation (7)
                 tree_mask = np.isin(data, tree_classes)
                 
                 total_pixels = np.sum(data > 0)
@@ -394,13 +563,24 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
                 
                 if total_pixels > 0:
                     coverage = (tree_pixels / total_pixels) * 100
+                    
+                    # Cache this data for next time
+                    if handler.connect():
+                        try:
+                            handler.cache_pixel_data(year, HUDSON_SQUARE_BOUNDS)
+                            print(f"✅ Cached pixel data for future use")
+                        except:
+                            pass
+                        finally:
+                            handler.disconnect()
+                    
                     return coverage, None  # No error message for successful COG access
                 else:
                     return 0.0, "No valid pixels found"
                 
     except Exception as e:
-        print(f"❌ Error accessing COG file for {year}: {e}")
-        return 0.0, f"COG access failed: {str(e)}"
+        print(f"❌ Error accessing data for {year}: {e}")
+        return 0.0, f"Data access failed: {str(e)}"
 
 # Example usage and testing
 if __name__ == "__main__":
