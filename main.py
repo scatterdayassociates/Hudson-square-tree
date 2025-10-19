@@ -1038,7 +1038,7 @@ def get_tree_cover(year):
 # Replace your create_map function with this updated version
 
 def create_tree_visualization_data(year, bounds):
-    """Create tree visualization data using cached pixel data (fast) or COG files (slow fallback)"""
+    """Create tree visualization data using cached visualization image (FASTEST) or COG files (slow fallback)"""
     try:
         from postgis_raster import PostGISRasterHandler
         import numpy as np
@@ -1048,9 +1048,11 @@ def create_tree_visualization_data(year, bounds):
         import base64
         import rasterio.transform
         
-        # Try to get cached pixel data first (FAST)
+        # Try to get cached visualization image first (FASTEST)
         handler = PostGISRasterHandler()
         data = None
+        cached_visualization = None
+        cached_geo_bounds = None
         
         if handler.connect():
             try:
@@ -1059,6 +1061,15 @@ def create_tree_visualization_data(year, bounds):
                 
                 if cached_result:
                     data, metadata = cached_result
+                    cached_visualization = metadata.get('visualization_image')
+                    cached_geo_bounds = metadata.get('geo_bounds')
+                    
+                    # If we have a cached visualization, return it immediately
+                    if cached_visualization and cached_geo_bounds:
+                        print(f"⚡⚡⚡ Using cached visualization image for {year} (instant!)")
+                        handler.disconnect()
+                        return cached_visualization, cached_geo_bounds, None
+                    
                     print(f"⚡ Using cached pixel data for visualization of {year}")
                     handler.disconnect()
                 else:
@@ -1134,8 +1145,8 @@ def create_tree_visualization_data(year, bounds):
                 geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
         
         # Create tree classification visualization (same for both cached and COG data)
-        # Class 2 = Trees, Class 7 = Grass/Vegetation
-        tree_mask = np.isin(data, [1])
+        # NYC 2017 LiDAR: Class 1 = Tree Canopy, Class 2 = Grass/Shrubs
+        tree_mask = np.isin(data, [1, 2])  # Tree Canopy (1) + Grass/Shrubs (2)
         
         # Create a colored visualization with transparency for areas outside polygon
         fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
@@ -1149,11 +1160,11 @@ def create_tree_visualization_data(year, bounds):
         masked_data = np.ma.masked_where(~valid_data_mask, data)
         ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
         
-        # Then overlay only the tree areas in green (only within polygon)
+        # Then overlay only the tree areas in GREEN (only within polygon)
         tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
         ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
         
-        # No title - just the visualization
+        # No title - just the visualization (title shown on map instead)
         ax.axis('off')
         plt.tight_layout(pad=0)
         
