@@ -6,7 +6,7 @@ from folium import raster_layers
 import json
 import os
 from datetime import datetime
-from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB, PROJECT_ID
+from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB, PROJECT_ID, get_study_area_bounds
 from postgis_raster import PostGISRasterHandler, get_tree_coverage_postgis, initialize_lidar_datasets
 
 # Page configuration
@@ -1016,11 +1016,12 @@ def get_tree_cover(year):
         
         # Create a simple Earth Engine image for visualization
         # This is just for the map display - actual data comes from the database
+        bounds = get_study_area_bounds()
         hudson_square = ee.Geometry.Rectangle([
-            HUDSON_SQUARE_BOUNDS['west'],
-            HUDSON_SQUARE_BOUNDS['south'],
-            HUDSON_SQUARE_BOUNDS['east'],
-            HUDSON_SQUARE_BOUNDS['north']
+            bounds['west'],
+            bounds['south'],
+            bounds['east'],
+            bounds['north']
         ])
         
         # Create a constant image with the calculated coverage for visualization
@@ -1037,7 +1038,7 @@ def get_tree_cover(year):
 # Replace your create_map function with this updated version
 
 def create_tree_visualization_data(year, bounds):
-    """Create tree visualization data from COG files"""
+    """Create tree visualization data from COG files with correct geographic bounds"""
     try:
         from postgis_raster import get_tree_coverage_postgis
         import rasterio
@@ -1047,57 +1048,100 @@ def create_tree_visualization_data(year, bounds):
         import matplotlib.colors as mcolors
         from io import BytesIO
         import base64
+        import rasterio.transform
         
         # Get the COG URL for this year
         cog_url = LIDAR_DATASETS.get(str(year))
         if not cog_url:
-            return None, f"No COG URL found for year {year}"
+            return None, None, f"No COG URL found for year {year}"
         
-        # Read the COG data
+        # Read the COG data with polygon masking
         with rasterio.open(cog_url) as src:
-            # Transform bounds to the raster's CRS
-            raster_bounds = transform_bounds('EPSG:4326', src.crs, 
-                                           bounds['west'], bounds['south'],
-                                           bounds['east'], bounds['north'])
-            
-            # Read the data for the study area
-            window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
-            data = src.read(1, window=window)
+            # Handle polygon masking for accurate visualization
+            if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+                from rasterio.mask import mask
+                import geopandas as gpd
+                from shapely.geometry import Polygon
+                
+                # Create polygon from coordinates
+                coords = HUDSON_SQUARE_BOUNDS['coordinates']
+                polygon = Polygon(coords)
+                
+                # Create GeoDataFrame
+                gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
+                gdf = gdf.to_crs(src.crs)
+                
+                # Use rasterio.mask to extract polygon data
+                # filled=False keeps nodata as the source nodata value
+                # crop=True crops to the bounding box of the polygon
+                data, out_transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
+                data = data[0]  # Get first band
+                
+                # Calculate actual geographic bounds of the cropped data
+                height, width = data.shape
+                bounds_window = rasterio.transform.array_bounds(height, width, out_transform)
+                
+                # Transform back to WGS84 for folium
+                from rasterio.warp import transform_bounds as trans_bounds
+                west, south, east, north = trans_bounds(
+                    src.crs, 'EPSG:4326',
+                    bounds_window[0], bounds_window[1], 
+                    bounds_window[2], bounds_window[3]
+                )
+                
+                geo_bounds = [[south, west], [north, east]]
+                
+            else:
+                # Legacy rectangle bounds
+                raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                               bounds['west'], bounds['south'],
+                                               bounds['east'], bounds['north'])
+                
+                window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+                data = src.read(1, window=window)
+                geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
             
             # Create tree classification visualization
             # Class 2 = Trees, Class 7 = Grass/Vegetation
             tree_mask = np.isin(data, [1])
             
-            # Create a colored visualization
-            fig, ax = plt.subplots(figsize=(8, 8))
+            # Create a colored visualization with transparency for areas outside polygon
+            fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
             
-            # First display the original data with a neutral colormap
+            # Mask out nodata values (areas outside polygon)
+            valid_data_mask = data != 0  # 0 is nodata value from rasterio.mask
+            
+            # First display the original data with a neutral colormap (only valid areas)
             colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
             cmap_original = mcolors.ListedColormap(colors_original)
-            ax.imshow(data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7)
+            masked_data = np.ma.masked_where(~valid_data_mask, data)
+            ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
             
-            # Then overlay only the tree areas in green
-            tree_overlay = np.ma.masked_where(~tree_mask, tree_mask)
-            ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1)
+            # Then overlay only the tree areas in green (only within polygon)
+            tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
+            ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
             
-            ax.set_title(f'{year} Tree Coverage - Hudson Square', fontsize=14, fontweight='bold')
+            # No title - just the visualization
             ax.axis('off')
+            plt.tight_layout(pad=0)
             
-            # Save to bytes
+            # Save to bytes with transparent background
             buffer = BytesIO()
-            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none')
+            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
+                       facecolor='none', edgecolor='none', transparent=True)
             buffer.seek(0)
             
             # Convert to base64
             image_base64 = base64.b64encode(buffer.getvalue()).decode()
             plt.close()
             
-            return f"data:image/png;base64,{image_base64}", None
+            return f"data:image/png;base64,{image_base64}", geo_bounds, None
             
     except Exception as e:
         print(f"Error creating tree visualization for {year}: {e}")
-        return None, str(e)
+        import traceback
+        traceback.print_exc()
+        return None, None, str(e)
 
 def create_map(cover_year1, cover_year2, year1, year2):
     """Create the interactive map using PostGIS data and COG files."""
@@ -1131,20 +1175,34 @@ def create_map(cover_year1, cover_year2, year1, year2):
         min_zoom=0
     ).add_to(folium_map)
     
-    # Add Hudson Square boundary
-    hudson_square_bounds = [
-        [HUDSON_SQUARE_BOUNDS['south'], HUDSON_SQUARE_BOUNDS['west']],
-        [HUDSON_SQUARE_BOUNDS['north'], HUDSON_SQUARE_BOUNDS['east']]
-    ]
-    
-    # Add boundary rectangle
-    folium.Rectangle(
-        bounds=hudson_square_bounds,
-        color='red',
-        weight=3,
-        fill=False,
-       
-    ).add_to(folium_map)
+    # Add Hudson Square boundary - handle both rectangle and polygon
+    if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+        # 6-point polygon boundary
+        coords = HUDSON_SQUARE_BOUNDS['coordinates']
+        # Convert to folium format (lat, lon)
+        folium_coords = [[coord[1], coord[0]] for coord in coords]
+        
+        folium.Polygon(
+            locations=folium_coords,
+            color='red',
+            weight=3,
+            fill=False,
+            popup="Hudson Square Study Area (6-point polygon)"
+        ).add_to(folium_map)
+    else:
+        # Legacy rectangle boundary
+        bounds = get_study_area_bounds()
+        hudson_square_bounds = [
+            [bounds['south'], bounds['west']],
+            [bounds['north'], bounds['east']]
+        ]
+        
+        folium.Rectangle(
+            bounds=hudson_square_bounds,
+            color='red',
+            weight=3,
+            fill=False,
+        ).add_to(folium_map)
     
     # Add COG layers as actual raster overlays on Google Maps
     # This uses the actual .tif files from Google Cloud Storage
@@ -1156,25 +1214,37 @@ def create_map(cover_year1, cover_year2, year1, year2):
         # Create ImageOverlay layers for the COG files
         # These will show the actual tree data as raster overlays
         
-        # Define bounds for the COG data
-        cog_bounds = [
-            [HUDSON_SQUARE_BOUNDS['south'], HUDSON_SQUARE_BOUNDS['west']],
-            [HUDSON_SQUARE_BOUNDS['north'], HUDSON_SQUARE_BOUNDS['east']]
-        ]
+        # Define bounds for the COG data - handle both rectangle and polygon
+        if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+            # Calculate bounding box for polygon
+            coords = HUDSON_SQUARE_BOUNDS['coordinates']
+            lats = [coord[1] for coord in coords]
+            lons = [coord[0] for coord in coords]
+            cog_bounds = [
+                [min(lats), min(lons)],  # SW corner
+                [max(lats), max(lons)]   # NE corner
+            ]
+        else:
+            # Legacy rectangle bounds
+            bounds = get_study_area_bounds()
+            cog_bounds = [
+                [bounds['south'], bounds['west']],
+                [bounds['north'], bounds['east']]
+            ]
         
         # Create separate layer groups for each year
         year1_layer = folium.FeatureGroup(name=f'{year1} Tree Coverage')
         year2_layer = folium.FeatureGroup(name=f'{year2} Tree Coverage')
         
-        # Create tree visualization images
-        year1_image, year1_error = create_tree_visualization_data(year1, HUDSON_SQUARE_BOUNDS)
-        year2_image, year2_error = create_tree_visualization_data(year2, HUDSON_SQUARE_BOUNDS)
+        # Create tree visualization images with correct geographic bounds
+        year1_image, year1_bounds, year1_error = create_tree_visualization_data(year1, get_study_area_bounds())
+        year2_image, year2_bounds, year2_error = create_tree_visualization_data(year2, get_study_area_bounds())
         
         # Add ImageOverlay for Year 1 (Red/Orange theme for 2010)
-        if year1_image:
+        if year1_image and year1_bounds:
             year1_overlay = raster_layers.ImageOverlay(
                 image=year1_image,
-                bounds=cog_bounds,
+                bounds=year1_bounds,  # Use the actual bounds from the data
                 opacity=0.7,
                 interactive=True,
                 cross_origin=False,
@@ -1195,10 +1265,10 @@ def create_map(cover_year1, cover_year2, year1, year2):
             ).add_to(year1_layer)
         
         # Add ImageOverlay for Year 2 (Blue theme for 2017)  
-        if year2_image:
+        if year2_image and year2_bounds:
             year2_overlay = raster_layers.ImageOverlay(
                 image=year2_image,
-                bounds=cog_bounds,
+                bounds=year2_bounds,  # Use the actual bounds from the data
                 opacity=0.7,
                 interactive=True,
                 cross_origin=False,
@@ -1218,48 +1288,19 @@ def create_map(cover_year1, cover_year2, year1, year2):
                 tooltip=f"{year2} Tree Coverage: {cover_year2:.2f}%"
             ).add_to(year2_layer)
         
-        # Add year-specific markers to their respective layers
-        center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
-        center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
-        
-        # Year 1 marker with tree icon (Orange for 2010)
-        folium.Marker(
-            [center_lat - 0.001, center_lon - 0.001],
-            popup=f"""
-            <div style="font-family: Arial, sans-serif; width: 250px;">
-                <h4 style="color: #ea580c; margin: 0 0 10px 0;">🌳 {year1} Tree Coverage</h4>
-                <p style="margin: 5px 0;"><strong>Coverage:</strong> {cover_year1:.2f}%</p>
-                <p style="margin: 5px 0;"><strong>Data Source:</strong> LiDAR COG File</p>
-                <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
-                <a href="{cog_url_1}" target="_blank" style="color: #ea580c;">📁 View {year1} COG File</a>
-            </div>
-            """,
-            tooltip=f"🌳 {year1} Tree Coverage: {cover_year1:.2f}%",
-            icon=folium.Icon(color='orange', icon='tree', prefix='fa')
-        ).add_to(year1_layer)
-        
-        # Year 2 marker with tree icon (Blue for 2017)
-        folium.Marker(
-            [center_lat + 0.001, center_lon + 0.001],
-            popup=f"""
-            <div style="font-family: Arial, sans-serif; width: 250px;">
-                <h4 style="color: #1e40af; margin: 0 0 10px 0;">🌳 {year2} Tree Coverage</h4>
-                <p style="margin: 5px 0;"><strong>Coverage:</strong> {cover_year2:.2f}%</p>
-                <p style="margin: 5px 0;"><strong>Data Source:</strong> LiDAR COG File</p>
-                <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
-                <a href="{cog_url_2}" target="_blank" style="color: #1e40af;">📁 View {year2} COG File</a>
-            </div>
-            """,
-            tooltip=f"🌳 {year2} Tree Coverage: {cover_year2:.2f}%",
-            icon=folium.Icon(color='blue', icon='tree', prefix='fa')
-        ).add_to(year2_layer)
-        
         # Create a comparison layer showing both years
         comparison_layer = folium.FeatureGroup(name='Analysis Summary')
         
         # Add center marker with summary to comparison layer
-        center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
-        center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
+        # Calculate center of polygon
+        if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+            coords = HUDSON_SQUARE_BOUNDS['coordinates']
+            center_lat = sum(coord[1] for coord in coords) / len(coords)
+            center_lon = sum(coord[0] for coord in coords) / len(coords)
+        else:
+            bounds = get_study_area_bounds()
+            center_lat = (bounds['north'] + bounds['south']) / 2
+            center_lon = (bounds['east'] + bounds['west']) / 2
         
         change = cover_year2 - cover_year1
         change_icon = '📈' if change > 0 else '📉' if change < 0 else '➡️'
@@ -1270,19 +1311,25 @@ def create_map(cover_year1, cover_year2, year1, year2):
             popup=f"""
             <div style="font-family: Arial, sans-serif; width: 300px;">
                 <h3 style="color: #dc2626; margin: 0 0 15px 0; text-align: center;">🌳 Hudson Square Tree Analysis</h3>
-                <div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                    <p style="margin: 5px 0; color: #ea580c;"><strong>{year1} Tree Coverage:</strong> {cover_year1:.2f}%</p>
-                    <p style="margin: 5px 0; color: #1e40af;"><strong>{year2} Tree Coverage:</strong> {cover_year2:.2f}%</p>
-                    <p style="margin: 5px 0; color: {change_color};"><strong>Change:</strong> {change:+.2f}% {change_icon}</p>
-                </div>
                 <div style="background: #fef3c7; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 5px 0; color: #ea580c;"><strong>🟠 {year1} Coverage:</strong> {cover_year1:.2f}%</p>
+                    <p style="margin: 5px 0;"><strong>Resolution:</strong> 5ft (1.5m)</p>
+                </div>
+                <div style="background: #dbeafe; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 5px 0; color: #1e40af;"><strong>🔵 {year2} Coverage:</strong> {cover_year2:.2f}%</p>
+                    <p style="margin: 5px 0;"><strong>Resolution:</strong> 6ft (1.8m)</p>
+                </div>
+                <div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>📊 Change:</strong> <span style="color: {change_color};">{change:+.2f}% {change_icon}</span></p>
+                </div>
+                <div style="margin-top: 10px;">
                     <p style="margin: 5px 0; font-size: 12px;"><strong>Data Sources:</strong></p>
                     <p style="margin: 5px 0; font-size: 12px;">• <a href="{cog_url_1}" target="_blank">{year1} LiDAR COG</a></p>
                     <p style="margin: 5px 0; font-size: 12px;">• <a href="{cog_url_2}" target="_blank">{year2} LiDAR COG</a></p>
                 </div>
             </div>
             """,
-            tooltip=f"🌳 Tree Coverage Analysis: {change:+.2f}% change",
+            tooltip=f"🌳 Tree Coverage: {year1}: {cover_year1:.2f}% → {year2}: {cover_year2:.2f}% ({change:+.2f}%)",
             icon=folium.Icon(color='red', icon='info-sign', prefix='fa')
         ).add_to(comparison_layer)
         
@@ -1294,8 +1341,9 @@ def create_map(cover_year1, cover_year2, year1, year2):
     except Exception as e:
         print(f"COG layers not available: {e}")
         # Add fallback markers with coverage information
-        center_lat = (HUDSON_SQUARE_BOUNDS['north'] + HUDSON_SQUARE_BOUNDS['south']) / 2
-        center_lon = (HUDSON_SQUARE_BOUNDS['east'] + HUDSON_SQUARE_BOUNDS['west']) / 2
+        bounds = get_study_area_bounds()
+        center_lat = (bounds['north'] + bounds['south']) / 2
+        center_lon = (bounds['east'] + bounds['west']) / 2
         
         folium.Marker(
             [center_lat, center_lon],
@@ -1439,29 +1487,37 @@ def main():
             <label class="label">Coordinates</label>
             <div class="coordinates-grid">
                 <div class="coordinate-input">
-                    <label class="input-label">West</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{west}</div>
+                    <label class="input-label">Clarkson &amp; West (NW)</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.735800</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">East</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{east}</div>
+                    <label class="input-label">Clarkson &amp; Varick (NE)</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.005800</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">North</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{north}</div>
+                    <label class="input-label">Vandam &amp; Varick</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.726200</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">South</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">{south}</div>
+                    <label class="input-label">Vandam &amp; 6th Ave</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.003900</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">Canal &amp; 6th Ave (SE)</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.718700</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">Canal &amp; West (SW)</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.008700</div>
                 </div>
             </div>
         </div>
  
         """.format(
-            west=HUDSON_SQUARE_BOUNDS['west'],
-            east=HUDSON_SQUARE_BOUNDS['east'],
-            north=HUDSON_SQUARE_BOUNDS['north'],
-            south=HUDSON_SQUARE_BOUNDS['south']
+            west=get_study_area_bounds()['west'],
+            east=get_study_area_bounds()['east'],
+            north=get_study_area_bounds()['north'],
+            south=get_study_area_bounds()['south']
         ), unsafe_allow_html=True)
         
         # Time Range section
@@ -1792,7 +1848,7 @@ def main():
             <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
                 <strong>💡 Map Tips:</strong> 
                 <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                    <li>Tree data resolution: 5ft (1.5m) from LiDAR COG files</li>
+                    <li>Tree data resolution: 2010: 5ft (1.5m), 2017: 6ft (1.8m) from LiDAR COG files</li>
                     <li>Use layer controls (top-right) to toggle tree coverage layers</li>
                     <li>Click markers for detailed tree coverage information</li>
                     <li>Blue overlay shows {year1} trees, Green overlay shows {year2} trees</li>
