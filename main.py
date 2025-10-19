@@ -1038,11 +1038,9 @@ def get_tree_cover(year):
 # Replace your create_map function with this updated version
 
 def create_tree_visualization_data(year, bounds):
-    """Create tree visualization data from COG files with correct geographic bounds"""
+    """Create tree visualization data using cached pixel data (fast) or COG files (slow fallback)"""
     try:
-        from postgis_raster import get_tree_coverage_postgis
-        import rasterio
-        from rasterio.warp import transform_bounds
+        from postgis_raster import PostGISRasterHandler
         import numpy as np
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -1050,92 +1048,126 @@ def create_tree_visualization_data(year, bounds):
         import base64
         import rasterio.transform
         
-        # Get the COG URL for this year
-        cog_url = LIDAR_DATASETS.get(str(year))
-        if not cog_url:
-            return None, None, f"No COG URL found for year {year}"
+        # Try to get cached pixel data first (FAST)
+        handler = PostGISRasterHandler()
+        data = None
         
-        # Read the COG data with polygon masking
-        with rasterio.open(cog_url) as src:
-            # Handle polygon masking for accurate visualization
+        if handler.connect():
+            try:
+                bounds_type = HUDSON_SQUARE_BOUNDS.get('type', 'rectangle')
+                cached_result = handler.get_cached_pixel_data(year, bounds_type)
+                
+                if cached_result:
+                    data, metadata = cached_result
+                    print(f"⚡ Using cached pixel data for visualization of {year}")
+                    handler.disconnect()
+                else:
+                    print(f"⚠️ No cached visualization data for {year}, reading from COG...")
+                    handler.disconnect()
+            except Exception as cache_error:
+                print(f"⚠️ Cache lookup failed: {cache_error}")
+                handler.disconnect()
+        
+        # If no cached data, read from COG file (SLOW - only happens once)
+        if data is None:
+            import rasterio
+            from rasterio.warp import transform_bounds
+            
+            # Get the COG URL for this year
+            cog_url = LIDAR_DATASETS.get(str(year))
+            if not cog_url:
+                return None, None, f"No COG URL found for year {year}"
+            
+            # Read the COG data with polygon masking
+            with rasterio.open(cog_url) as src:
+                # Handle polygon masking for accurate visualization
+                if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+                    from rasterio.mask import mask
+                    import geopandas as gpd
+                    from shapely.geometry import Polygon
+                    
+                    # Create polygon from coordinates
+                    coords = HUDSON_SQUARE_BOUNDS['coordinates']
+                    polygon = Polygon(coords)
+                    
+                    # Create GeoDataFrame
+                    gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
+                    gdf = gdf.to_crs(src.crs)
+                    
+                    # Use rasterio.mask to extract polygon data
+                    # filled=False keeps nodata as the source nodata value
+                    # crop=True crops to the bounding box of the polygon
+                    data, out_transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
+                    data = data[0]  # Get first band
+                    
+                    # Calculate actual geographic bounds of the cropped data
+                    height, width = data.shape
+                    bounds_window = rasterio.transform.array_bounds(height, width, out_transform)
+                    
+                    # Transform back to WGS84 for folium
+                    from rasterio.warp import transform_bounds as trans_bounds
+                    west, south, east, north = trans_bounds(
+                        src.crs, 'EPSG:4326',
+                        bounds_window[0], bounds_window[1], 
+                        bounds_window[2], bounds_window[3]
+                    )
+                    
+                    geo_bounds = [[south, west], [north, east]]
+                    
+                else:
+                    # Legacy rectangle bounds
+                    raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                                   bounds['west'], bounds['south'],
+                                                   bounds['east'], bounds['north'])
+                    
+                    window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+                    data = src.read(1, window=window)
+                    geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
+        else:
+            # Using cached data - calculate geo_bounds from HUDSON_SQUARE_BOUNDS
             if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
-                from rasterio.mask import mask
-                import geopandas as gpd
-                from shapely.geometry import Polygon
-                
-                # Create polygon from coordinates
                 coords = HUDSON_SQUARE_BOUNDS['coordinates']
-                polygon = Polygon(coords)
-                
-                # Create GeoDataFrame
-                gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
-                gdf = gdf.to_crs(src.crs)
-                
-                # Use rasterio.mask to extract polygon data
-                # filled=False keeps nodata as the source nodata value
-                # crop=True crops to the bounding box of the polygon
-                data, out_transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
-                data = data[0]  # Get first band
-                
-                # Calculate actual geographic bounds of the cropped data
-                height, width = data.shape
-                bounds_window = rasterio.transform.array_bounds(height, width, out_transform)
-                
-                # Transform back to WGS84 for folium
-                from rasterio.warp import transform_bounds as trans_bounds
-                west, south, east, north = trans_bounds(
-                    src.crs, 'EPSG:4326',
-                    bounds_window[0], bounds_window[1], 
-                    bounds_window[2], bounds_window[3]
-                )
-                
-                geo_bounds = [[south, west], [north, east]]
-                
+                lats = [coord[1] for coord in coords]
+                lons = [coord[0] for coord in coords]
+                geo_bounds = [[min(lats), min(lons)], [max(lats), max(lons)]]
             else:
-                # Legacy rectangle bounds
-                raster_bounds = transform_bounds('EPSG:4326', src.crs, 
-                                               bounds['west'], bounds['south'],
-                                               bounds['east'], bounds['north'])
-                
-                window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
-                data = src.read(1, window=window)
                 geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
-            
-            # Create tree classification visualization
-            # Class 2 = Trees, Class 7 = Grass/Vegetation
-            tree_mask = np.isin(data, [1])
-            
-            # Create a colored visualization with transparency for areas outside polygon
-            fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
-            
-            # Mask out nodata values (areas outside polygon)
-            valid_data_mask = data != 0  # 0 is nodata value from rasterio.mask
-            
-            # First display the original data with a neutral colormap (only valid areas)
-            colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
-            cmap_original = mcolors.ListedColormap(colors_original)
-            masked_data = np.ma.masked_where(~valid_data_mask, data)
-            ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
-            
-            # Then overlay only the tree areas in green (only within polygon)
-            tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
-            ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
-            
-            # No title - just the visualization
-            ax.axis('off')
-            plt.tight_layout(pad=0)
-            
-            # Save to bytes with transparent background
-            buffer = BytesIO()
-            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
-                       facecolor='none', edgecolor='none', transparent=True)
-            buffer.seek(0)
-            
-            # Convert to base64
-            image_base64 = base64.b64encode(buffer.getvalue()).decode()
-            plt.close()
-            
-            return f"data:image/png;base64,{image_base64}", geo_bounds, None
+        
+        # Create tree classification visualization (same for both cached and COG data)
+        # Class 2 = Trees, Class 7 = Grass/Vegetation
+        tree_mask = np.isin(data, [1])
+        
+        # Create a colored visualization with transparency for areas outside polygon
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
+        
+        # Mask out nodata values (areas outside polygon)
+        valid_data_mask = data != 0  # 0 is nodata value from rasterio.mask
+        
+        # First display the original data with a neutral colormap (only valid areas)
+        colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
+        cmap_original = mcolors.ListedColormap(colors_original)
+        masked_data = np.ma.masked_where(~valid_data_mask, data)
+        ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
+        
+        # Then overlay only the tree areas in green (only within polygon)
+        tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
+        ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
+        
+        # No title - just the visualization
+        ax.axis('off')
+        plt.tight_layout(pad=0)
+        
+        # Save to bytes with transparent background
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
+                   facecolor='none', edgecolor='none', transparent=True)
+        buffer.seek(0)
+        
+        # Convert to base64
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}", geo_bounds, None
             
     except Exception as e:
         print(f"Error creating tree visualization for {year}: {e}")
