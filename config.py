@@ -14,7 +14,9 @@ DATABASE_CONFIGS = {
         "password": "AVNS_tOw1EdQTU-OwMnbMvNn",
         "host": "db-postgresql-nyc3-47709-do-user-19616823-0.k.db.ondigitalocean.com",
         "port": 25060,
-        "sslmode": "require"
+        "sslmode": "require",
+        "connect_timeout": 10,  # Connection timeout in seconds
+        "options": "-c statement_timeout=30000"  # Query timeout: 30 seconds
     },
 
 }
