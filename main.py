@@ -6,8 +6,29 @@ from folium import raster_layers
 import json
 import os
 from datetime import datetime
+import ee
 from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB, PROJECT_ID, get_study_area_bounds
 from postgis_raster import PostGISRasterHandler, get_tree_coverage_postgis, initialize_lidar_datasets
+
+# Initialize Earth Engine
+try:
+    # Try to authenticate with service account
+    service_account = f'{PROJECT_ID}@{PROJECT_ID}.iam.gserviceaccount.com'
+    credentials_path = 'seventh-tempest-348517-0e469e23d80c.json'
+    
+    if os.path.exists(credentials_path):
+        credentials = ee.ServiceAccountCredentials(service_account, credentials_path)
+        ee.Initialize(credentials, project=PROJECT_ID)
+    else:
+        # Fallback to regular authentication
+        ee.Initialize(project=PROJECT_ID)
+except Exception as e:
+    print(f"Earth Engine initialization error: {e}")
+    # Try alternative initialization
+    try:
+        ee.Initialize()
+    except:
+        pass
 
 # Page configuration
 st.set_page_config(
