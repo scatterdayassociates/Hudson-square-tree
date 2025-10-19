@@ -6,29 +6,10 @@ from folium import raster_layers
 import json
 import os
 from datetime import datetime
-import ee
+from typing import Tuple
 from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, ACTIVE_DB, PROJECT_ID, get_study_area_bounds
 from postgis_raster import PostGISRasterHandler, get_tree_coverage_postgis, initialize_lidar_datasets
-
-# Initialize Earth Engine
-try:
-    # Try to authenticate with service account
-    service_account = f'{PROJECT_ID}@{PROJECT_ID}.iam.gserviceaccount.com'
-    credentials_path = 'seventh-tempest-348517-0e469e23d80c.json'
-    
-    if os.path.exists(credentials_path):
-        credentials = ee.ServiceAccountCredentials(service_account, credentials_path)
-        ee.Initialize(credentials, project=PROJECT_ID)
-    else:
-        # Fallback to regular authentication
-        ee.Initialize(project=PROJECT_ID)
-except Exception as e:
-    print(f"Earth Engine initialization error: {e}")
-    # Try alternative initialization
-    try:
-        ee.Initialize()
-    except:
-        pass
+import numpy as np
 
 # Page configuration
 st.set_page_config(
@@ -988,33 +969,100 @@ st.markdown("""
 # Constants are now imported from config.py
 
 
-@st.cache_resource(ttl=3600, show_spinner=False)  # Cache for 1 hour
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def read_cog_data_cached(year: int):
+    """
+    Read COG file data with caching to avoid multiple reads.
+    Uses timeouts and GDAL optimizations for faster loading.
+    Returns: (data_array, transform, bounds, error_message)
+    """
+    try:
+        import rasterio
+        from rasterio.warp import transform_bounds
+        from rasterio.mask import mask
+        import geopandas as gpd
+        from shapely.geometry import Polygon
+        import rasterio.session
+        import rasterio.transform
+        
+        cog_url = LIDAR_DATASETS.get(str(year))
+        if not cog_url:
+            return None, None, None, f"No COG URL found for year {year}"
+        
+        print(f"📥 Reading COG file for {year} (will be cached): {cog_url}")
+        
+        # Session with authentication
+        session = rasterio.session.AWSSession(
+            aws_access_key_id=None,
+            aws_secret_access_key=None,
+            region_name=None,
+            requester_pays=False,
+            session=None,
+            endpoint_url=None,
+            aws_unsigned=True
+        )
+        
+        # Use faster settings with timeouts - critical for Streamlit Cloud
+        with rasterio.Env(
+            session=session,
+            GDAL_HTTP_TIMEOUT=30,  # 30 second timeout for HTTP requests
+            GDAL_HTTP_CONNECTTIMEOUT=10,  # 10 second connection timeout
+            CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif',  # Only allow .tif files
+            GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR',  # Faster opening
+            GDAL_HTTP_MAX_RETRY=3,  # Retry up to 3 times
+            GDAL_HTTP_RETRY_DELAY=1  # 1 second between retries
+        ):
+            with rasterio.open(cog_url) as src:
+                # Handle polygon masking
+                if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+                    coords = HUDSON_SQUARE_BOUNDS['coordinates']
+                    polygon = Polygon(coords)
+                    
+                    gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
+                    gdf = gdf.to_crs(src.crs)
+                    
+                    # Read the data (COG files handle overviews internally)
+                    data, out_transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
+                    data = data[0]
+                    
+                    # Calculate bounds
+                    height, width = data.shape
+                    bounds_window = rasterio.transform.array_bounds(height, width, out_transform)
+                    
+                    west, south, east, north = rasterio.warp.transform_bounds(
+                        src.crs, 'EPSG:4326',
+                        bounds_window[0], bounds_window[1], 
+                        bounds_window[2], bounds_window[3]
+                    )
+                    
+                    geo_bounds = [[south, west], [north, east]]
+                    
+                else:
+                    # Rectangle bounds
+                    bounds = get_study_area_bounds()
+                    raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                                   bounds['west'], bounds['south'],
+                                                   bounds['east'], bounds['north'])
+                    
+                    window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+                    data = src.read(1, window=window)
+                    geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
+                
+                print(f"✅ Successfully read and cached {data.shape} pixels for {year}")
+                return data, out_transform if 'out_transform' in locals() else None, geo_bounds, None
+                
+    except Exception as e:
+        print(f"❌ Error reading COG file for {year}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None, None, str(e)
+
+@st.cache_resource
 def authenticate_database():
     """
     Authenticate and initialize database for large LiDAR datasets
-    Supports multiple database backends with timeout handling for Streamlit Cloud
+    Supports multiple database backends
     """
-    import signal
-    from contextlib import contextmanager
-    
-    @contextmanager
-    def timeout(seconds):
-        """Timeout context manager for Streamlit Cloud"""
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Operation timed out")
-        
-        # Only use signal on Unix-like systems
-        import platform
-        if platform.system() != 'Windows':
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(seconds)
-        try:
-            yield
-        finally:
-            if platform.system() != 'Windows':
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-    
     try:
         if ACTIVE_DB == "local_postgres":
             # Use local PostgreSQL backend
@@ -1025,58 +1073,72 @@ def authenticate_database():
                     return True, "✅ Local PostgreSQL connected and LiDAR datasets initialized"
                 else:
                     handler.disconnect()
-                    return False, "⚠️ Database connected, using fallback data"
+                    return False, "❌ Failed to initialize LiDAR datasets"
             else:
-                return False, "⚠️ Using cached fallback data (database unavailable)"
+                return False, "❌ Failed to connect to local PostgreSQL database"
                 
         elif ACTIVE_DB == "digitalocean":
-            # Use DigitalOcean PostgreSQL backend with timeout
-            try:
-                handler = PostGISRasterHandler()
-                if handler.connect():
-                    # Try to initialize, but don't fail if it times out
-                    try:
-                        initialize_lidar_datasets()
-                        handler.disconnect()
-                        return True, "✅ DigitalOcean PostgreSQL connected"
-                    except Exception as init_error:
-                        handler.disconnect()
-                        return True, f"✅ Database connected (using direct COG access)"
+            # Use DigitalOcean PostgreSQL backend
+            handler = PostGISRasterHandler()
+            if handler.connect():
+                if initialize_lidar_datasets():
+                    handler.disconnect()
+                    return True, "✅ DigitalOcean PostgreSQL connected and LiDAR datasets initialized"
                 else:
-                    return False, "⚠️ Using cached data (database connection timeout)"
-            except Exception as db_error:
-                return False, f"⚠️ Using cached data: {str(db_error)[:50]}"
+                    handler.disconnect()
+                    return False, "❌ Failed to initialize LiDAR datasets"
+            else:
+                return False, "❌ Failed to connect to DigitalOcean database"
         else:
             return False, f"❌ Unknown database type: {ACTIVE_DB}"
             
-    except TimeoutError:
-        return False, "⚠️ Connection timeout - using cached data"
     except Exception as e:
-        return False, f"⚠️ Using fallback data: {str(e)[:50]}"
+        return False, f"❌ Database authentication failed: {str(e)}"
+
+def calculate_tree_coverage_from_data(data: np.ndarray, year: int) -> Tuple[float, str]:
+    """Calculate tree coverage from cached COG data"""
+    try:
+        if data is None:
+            return 0.0, "No data available"
+        
+        # Apply tree classification
+        tree_classes = [2, 7]  # Tree (2) and Grass/Vegetation (7)
+        tree_mask = np.isin(data, tree_classes)
+        
+        total_pixels = np.sum(data > 0)
+        tree_pixels = np.sum(tree_mask)
+        
+        if total_pixels > 0:
+            coverage = (tree_pixels / total_pixels) * 100
+            return coverage, None
+        else:
+            # Fallback to NYC official data
+            if year == 2010:
+                return 21.3, "Using NYC Tree Canopy Assessment data (5ft resolution)"
+            elif year == 2017:
+                return 22.5, "Using NYC Tree Canopy Assessment data (6ft resolution)"
+            else:
+                return 0.0, "No valid pixels found"
+    except Exception as e:
+        print(f"❌ Error calculating coverage: {e}")
+        return 0.0, str(e)
 
 def get_tree_cover(year):
-    """Fetch tree cover for the given year using the active database backend."""
+    """Fetch tree cover for the given year using cached COG data."""
     try:
-        # Use PostgreSQL backend
-        coverage, error = get_tree_coverage_postgis(year)
+        # Use cached COG data
+        data, transform, bounds, error = read_cog_data_cached(year)
         
         if error:
-            return None, f"Database error for {year}: {error}"
+            return None, f"COG read error for {year}: {error}"
         
-        # Create a simple Earth Engine image for visualization
-        # This is just for the map display - actual data comes from the database
-        bounds = get_study_area_bounds()
-        hudson_square = ee.Geometry.Rectangle([
-            bounds['west'],
-            bounds['south'],
-            bounds['east'],
-            bounds['north']
-        ])
+        # Calculate coverage from cached data
+        coverage, calc_error = calculate_tree_coverage_from_data(data, year)
         
-        # Create a constant image with the calculated coverage for visualization
-        tree_cover = ee.Image.constant(coverage).clip(hudson_square).rename('tree_cover')
+        if calc_error:
+            return None, calc_error
         
-        return tree_cover, None
+        return coverage, None
         
     except Exception as e:
         print(f"Error in get_tree_cover for {year}: {str(e)}")
@@ -1086,116 +1148,56 @@ def get_tree_cover(year):
 
 # Replace your create_map function with this updated version
 
-@st.cache_data(ttl=3600, show_spinner=False)  # Cache visualizations
 def create_tree_visualization_data(year, bounds):
-    """Create tree visualization data from COG files with correct geographic bounds"""
+    """Create tree visualization data from cached COG data"""
     try:
-        from postgis_raster import get_tree_coverage_postgis
-        import rasterio
-        from rasterio.warp import transform_bounds
-        import numpy as np
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
         from io import BytesIO
         import base64
-        import rasterio.transform
         
-        # Get the COG URL for this year
-        cog_url = LIDAR_DATASETS.get(str(year))
-        if not cog_url:
-            return None, None, f"No COG URL found for year {year}"
+        # Use cached COG data instead of reading again
+        data, out_transform, geo_bounds, error = read_cog_data_cached(year)
         
-        # Configure GDAL with timeouts for Streamlit Cloud
-        env_options = {
-            'GDAL_HTTP_TIMEOUT': '30000',
-            'GDAL_HTTP_CONNECTTIMEOUT': '10000',
-            'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif',
-            'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR'
-        }
+        if error or data is None:
+            return None, None, error or "No data available"
         
-        # Read the COG data with polygon masking
-        with rasterio.Env(**env_options):
-            with rasterio.open(cog_url) as src:
-                # Handle polygon masking for accurate visualization
-                if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
-                    from rasterio.mask import mask
-                    import geopandas as gpd
-                    from shapely.geometry import Polygon
-                    
-                    # Create polygon from coordinates
-                    coords = HUDSON_SQUARE_BOUNDS['coordinates']
-                    polygon = Polygon(coords)
-                    
-                    # Create GeoDataFrame
-                    gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
-                    gdf = gdf.to_crs(src.crs)
-                    
-                    # Use rasterio.mask to extract polygon data
-                    # filled=False keeps nodata as the source nodata value
-                    # crop=True crops to the bounding box of the polygon
-                    data, out_transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
-                    data = data[0]  # Get first band
-                    
-                    # Calculate actual geographic bounds of the cropped data
-                    height, width = data.shape
-                    bounds_window = rasterio.transform.array_bounds(height, width, out_transform)
-                    
-                    # Transform back to WGS84 for folium
-                    from rasterio.warp import transform_bounds as trans_bounds
-                    west, south, east, north = trans_bounds(
-                        src.crs, 'EPSG:4326',
-                        bounds_window[0], bounds_window[1], 
-                        bounds_window[2], bounds_window[3]
-                    )
-                    
-                    geo_bounds = [[south, west], [north, east]]
-                    
-                else:
-                    # Legacy rectangle bounds
-                    raster_bounds = transform_bounds('EPSG:4326', src.crs, 
-                                                   bounds['west'], bounds['south'],
-                                                   bounds['east'], bounds['north'])
-                    
-                    window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
-                    data = src.read(1, window=window)
-                    geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
-            
-            # Create tree classification visualization
-            # Class 2 = Trees, Class 7 = Grass/Vegetation
-            tree_mask = np.isin(data, [1])
-            
-            # Create a colored visualization with transparency for areas outside polygon
-            fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
-            
-            # Mask out nodata values (areas outside polygon)
-            valid_data_mask = data != 0  # 0 is nodata value from rasterio.mask
-            
-            # First display the original data with a neutral colormap (only valid areas)
-            colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
-            cmap_original = mcolors.ListedColormap(colors_original)
-            masked_data = np.ma.masked_where(~valid_data_mask, data)
-            ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
-            
-            # Then overlay only the tree areas in green (only within polygon)
-            tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
-            ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
-            
-            # No title - just the visualization
-            ax.axis('off')
-            plt.tight_layout(pad=0)
-            
-            # Save to bytes with transparent background
-            buffer = BytesIO()
-            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
-                       facecolor='none', edgecolor='none', transparent=True)
-            buffer.seek(0)
-            
-            # Convert to base64
-            image_base64 = base64.b64encode(buffer.getvalue()).decode()
-            plt.close()
-            
-            return f"data:image/png;base64,{image_base64}", geo_bounds, None
-            
+        # Create tree classification visualization
+        # Class 2 = Trees, Class 7 = Grass/Vegetation
+        tree_mask = np.isin(data, [1])
+        
+        # Create a colored visualization with transparency for areas outside polygon
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
+        
+        # Mask out nodata values (areas outside polygon)
+        valid_data_mask = data != 0  # 0 is nodata value from rasterio.mask
+        
+        # First display the original data with a neutral colormap (only valid areas)
+        colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
+        cmap_original = mcolors.ListedColormap(colors_original)
+        masked_data = np.ma.masked_where(~valid_data_mask, data)
+        ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
+        
+        # Then overlay only the tree areas in green (only within polygon)
+        tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
+        ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
+        
+        # No title - just the visualization
+        ax.axis('off')
+        plt.tight_layout(pad=0)
+        
+        # Save to bytes with transparent background
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
+                   facecolor='none', edgecolor='none', transparent=True)
+        buffer.seek(0)
+        
+        # Convert to base64
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}", geo_bounds, None
+        
     except Exception as e:
         print(f"Error creating tree visualization for {year}: {e}")
         import traceback
@@ -1718,28 +1720,22 @@ def main():
             year1 = st.session_state.selected_year1
             year2 = st.session_state.selected_year2
             
-            # Calculate coverage using PostgreSQL backend with fallback
-            # Use cached function to avoid repeated slow operations
-            @st.cache_data(ttl=3600, show_spinner=False)  # Cache for 1 hour
-            def get_cached_tree_coverage(year):
-                """Get tree coverage with caching"""
-                try:
-                    cover, error = get_tree_coverage_postgis(year)
-                    if error or cover == 0.0:
-                        # Use fallback data from NYC Tree Canopy Assessment
-                        fallback_data = {
-                            2010: 21.3,  # 5ft resolution LiDAR
-                            2017: 22.5   # 6ft resolution LiDAR
-                        }
-                        return fallback_data.get(year, 20.0), f"Using NYC official data"
-                    return cover, None
-                except Exception as e:
-                    # Fallback to official data on any error
-                    fallback_data = {2010: 21.3, 2017: 22.5}
-                    return fallback_data.get(year, 20.0), f"Fallback: {str(e)[:30]}"
+            # Calculate coverage using cached COG data
+            # This reads each COG file only ONCE and caches it
+            data1, _, _, error1 = read_cog_data_cached(year1)
+            data2, _, _, error2 = read_cog_data_cached(year2)
             
-            cover_1, error1 = get_cached_tree_coverage(year1)
-            cover_2, error2 = get_cached_tree_coverage(year2)
+            # Calculate coverage from cached data
+            cover_1, calc_error1 = calculate_tree_coverage_from_data(data1, year1)
+            cover_2, calc_error2 = calculate_tree_coverage_from_data(data2, year2)
+            
+            if error1 or calc_error1:
+                print(f"⚠️ Using fallback data for {year1}: {error1 or calc_error1}")
+                cover_1 = 21.3 if year1 == 2010 else 22.5 if year1 == 2017 else 0.0
+        
+            if error2 or calc_error2:
+                print(f"⚠️ Using fallback data for {year2}: {error2 or calc_error2}")
+                cover_2 = 21.3 if year2 == 2010 else 22.5 if year2 == 2017 else 0.0
       
             
             # Create visualization
