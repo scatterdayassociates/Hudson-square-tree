@@ -26,12 +26,7 @@ class PostGISRasterHandler:
     def connect(self) -> bool:
         """Establish connection to PostGIS database"""
         try:
-            # Add connection timeout for Streamlit Cloud
-            config = DATABASE_CONFIG.copy()
-            config['connect_timeout'] = 10000  # 10 second timeout
-            config['options'] = '-c statement_timeout=300000'  # 30 second query timeout
-            
-            self.connection = psycopg2.connect(**config)
+            self.connection = psycopg2.connect(**DATABASE_CONFIG)
             self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
             # Enable PostGIS and raster extensions
@@ -338,20 +333,26 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
         
         print(f"🔍 Accessing COG file directly: {cog_url}")
         
-        # Add headers and timeout to avoid 403 errors and hanging
+        # Add headers to avoid 403 errors with timeout
         import rasterio.session
-        import rasterio.env
+        session = rasterio.session.AWSSession(
+            aws_access_key_id=None,
+            aws_secret_access_key=None,
+            region_name=None,
+            requester_pays=False,
+            session=None,
+            endpoint_url=None,
+            aws_unsigned=True
+        )
         
-        # Configure with timeout for Streamlit Cloud
-        env_options = {
-            'GDAL_HTTP_TIMEOUT': '30000',  # 30 second timeout
-            'GDAL_HTTP_CONNECTTIMEOUT': '10000',  # 10 second connection timeout
-            'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif',
-            'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR',
-            'CPL_VSIL_CURL_USE_HEAD': 'NO'
-        }
-        
-        with rasterio.Env(**env_options):
+        # Set timeouts and use overviews for faster loading
+        with rasterio.Env(
+            session=session,
+            GDAL_HTTP_TIMEOUT=30,
+            GDAL_HTTP_CONNECTTIMEOUT=10,
+            CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif',
+            GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR'
+        ):
             with rasterio.open(cog_url) as src:
                 # Handle polygon masking for accurate tree coverage
                 if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
