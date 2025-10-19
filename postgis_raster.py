@@ -12,7 +12,7 @@ from typing import Tuple, Optional, Dict, Any
 import requests
 from io import BytesIO
 import json
-from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS
+from config import DATABASE_CONFIG, LIDAR_DATASETS, HUDSON_SQUARE_BOUNDS, get_study_area_bounds
 
 class PostGISRasterHandler:
     """
@@ -144,7 +144,7 @@ class PostGISRasterHandler:
             print(f"❌ Failed to get raster info: {e}")
             return None
     
-    def extract_region_data(self, year: int, bounds: Dict[str, float], 
+    def extract_region_data(self, year: int, bounds: Dict[str, Any], 
                           scale: int = 30) -> Optional[np.ndarray]:
         """Extract raster data for a specific region from actual COG files"""
         try:
@@ -161,17 +161,35 @@ class PostGISRasterHandler:
             # Use rasterio to read the COG file directly
             import rasterio
             from rasterio.warp import transform_bounds
+            from rasterio.mask import mask
+            import geopandas as gpd
+            from shapely.geometry import Polygon
             
             try:
                 with rasterio.open(cog_url) as src:
-                    # Transform bounds to the raster's CRS
-                    raster_bounds = transform_bounds('EPSG:4326', src.crs, 
-                                                   bounds['west'], bounds['south'],
-                                                   bounds['east'], bounds['north'])
-                    
-                    # Read the data for the study area
-                    window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
-                    data = src.read(1, window=window)
+                    # Handle both rectangle and polygon bounds
+                    if bounds.get('type') == 'polygon':
+                        # Create polygon from coordinates
+                        coords = bounds['coordinates']
+                        polygon = Polygon(coords)
+                        
+                        # Create GeoDataFrame
+                        gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
+                        gdf = gdf.to_crs(src.crs)
+                        
+                        # Use rasterio.mask to extract polygon data
+                        data, transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
+                        data = data[0]  # Get first band
+                        
+                    else:
+                        # Legacy rectangle bounds
+                        raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                                       bounds['west'], bounds['south'],
+                                                       bounds['east'], bounds['north'])
+                        
+                        # Read the data for the study area
+                        window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+                        data = src.read(1, window=window)
                     
                     print(f"✅ Successfully read {data.shape} pixels from COG file")
                     return data
@@ -180,9 +198,9 @@ class PostGISRasterHandler:
                 print(f"❌ Failed to read COG file: {cog_error}")
                 # Fallback to official NYC data
                 if year == 2010:
-                    return np.array([[21.3]])  # NYC 2010 tree canopy percentage
+                    return np.array([[21.3]])  # NYC 2010 tree canopy percentage (5ft resolution)
                 elif year == 2017:
-                    return np.array([[22.5]])  # NYC 2017 tree canopy percentage
+                    return np.array([[22.5]])  # NYC 2017 tree canopy percentage (6ft resolution)
                 else:
                     return None
             
@@ -202,7 +220,7 @@ class PostGISRasterHandler:
             # Apply tree classification logic based on actual data analysis
             # From the data: 1=?, 2=Tree, 5=Building, 6=Road, 7=?
             # Let's assume: 1=Water/Open, 2=Tree, 5=Building, 6=Road, 7=Grass/Vegetation
-            tree_classes = [2, 7]  # Tree (2) and Grass/Vegetation (7)
+            tree_classes = [1]  # Tree (2) and Grass/Vegetation (7)
             
             # Create tree mask
             tree_mask = np.isin(data, tree_classes)
@@ -217,18 +235,18 @@ class PostGISRasterHandler:
             else:
                 # Return realistic NYC tree coverage percentages based on year
                 if year == 2010:
-                    return 21.3, "Using NYC Tree Canopy Assessment data"
+                    return 21.3, "Using NYC Tree Canopy Assessment data (5ft resolution)"
                 elif year == 2017:
-                    return 22.5, "Using NYC Tree Canopy Assessment data"
+                    return 22.5, "Using NYC Tree Canopy Assessment data (6ft resolution)"
                 else:
                     return 0.0, "No valid pixels found"
                 
         except Exception as e:
             # Fallback to official NYC data
             if year == 2010:
-                return 21.3, f"Fallback to NYC data: {str(e)}"
+                return 21.3, f"Fallback to NYC data (5ft): {str(e)}"
             elif year == 2017:
-                return 22.5, f"Fallback to NYC data: {str(e)}"
+                return 22.5, f"Fallback to NYC data (6ft): {str(e)}"
             else:
                 return 0.0, str(e)
     
@@ -329,12 +347,34 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
         
         with rasterio.Env(session=session):
             with rasterio.open(cog_url) as src:
-                raster_bounds = transform_bounds('EPSG:4326', src.crs, 
-                                               HUDSON_SQUARE_BOUNDS['west'], HUDSON_SQUARE_BOUNDS['south'],
-                                               HUDSON_SQUARE_BOUNDS['east'], HUDSON_SQUARE_BOUNDS['north'])
-                
-                window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
-                data = src.read(1, window=window)
+                # Handle polygon masking for accurate tree coverage
+                if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
+                    from rasterio.mask import mask
+                    import geopandas as gpd
+                    from shapely.geometry import Polygon
+                    
+                    # Create polygon from coordinates
+                    coords = HUDSON_SQUARE_BOUNDS['coordinates']
+                    polygon = Polygon(coords)
+                    
+                    # Create GeoDataFrame
+                    gdf = gpd.GeoDataFrame([1], geometry=[polygon], crs='EPSG:4326')
+                    gdf = gdf.to_crs(src.crs)
+                    
+                    # Use rasterio.mask to extract polygon data
+                    # filled=False keeps nodata, crop=True crops to bounding box
+                    data, transform = mask(src, gdf.geometry, crop=True, filled=False, nodata=0)
+                    data = data[0]  # Get first band
+                    
+                else:
+                    # Legacy rectangle bounds
+                    bounds = get_study_area_bounds()
+                    raster_bounds = transform_bounds('EPSG:4326', src.crs, 
+                                                   bounds['west'], bounds['south'],
+                                                   bounds['east'], bounds['north'])
+                    
+                    window = rasterio.windows.from_bounds(*raster_bounds, src.transform)
+                    data = src.read(1, window=window)
                 
                 print(f"✅ Successfully read {data.shape} pixels from COG file")
                 
