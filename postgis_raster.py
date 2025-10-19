@@ -87,6 +87,8 @@ class PostGISRasterHandler:
                 total_pixels BIGINT,
                 tree_pixels BIGINT,
                 coverage_percent FLOAT,
+                visualization_image TEXT,
+                geo_bounds TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(year, bounds_type)
             );
@@ -247,10 +249,10 @@ class PostGISRasterHandler:
             if data is None:
                 return 0.0, "No data available"
             
-            # Apply tree classification logic based on actual data analysis
-            # From the data: 1=?, 2=Tree, 5=Building, 6=Road, 7=?
-            # Let's assume: 1=Water/Open, 2=Tree, 5=Building, 6=Road, 7=Grass/Vegetation
-            tree_classes = [1]  # Tree (2) and Grass/Vegetation (7)
+            # NYC 2017 LiDAR 8-class system:
+            # 1=Tree Canopy, 2=Grass/Shrubs, 3=Bare Soil, 4=Water, 
+            # 5=Buildings, 6=Roads, 7=Other Impervious, 8=Railroads
+            tree_classes = [1, 2]  # Tree Canopy (1) + Grass/Shrubs (2)
             
             # Create tree mask
             tree_mask = np.isin(data, tree_classes)
@@ -305,11 +307,16 @@ class PostGISRasterHandler:
                 return False
             
             # Calculate statistics
-            tree_classes = [1]  # Tree and vegetation
+            # NYC 2017 LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
+            tree_classes = [1, 2]  # Tree Canopy + Grass/Shrubs
             tree_mask = np.isin(data, tree_classes)
             total_pixels = int(np.sum(data > 0))
             tree_pixels = int(np.sum(tree_mask))
             coverage = (tree_pixels / total_pixels * 100) if total_pixels > 0 else 0.0
+            
+            # Generate visualization image
+            print(f"🎨 Generating visualization image for year {year}...")
+            visualization_image, geo_bounds = self._create_visualization_image(data, bounds)
             
             # Compress and store pixel data
             import zlib
@@ -318,8 +325,8 @@ class PostGISRasterHandler:
             insert_sql = """
             INSERT INTO pixel_cache 
             (year, pixel_data, data_shape, bounds_type, bounds_data, 
-             total_pixels, tree_pixels, coverage_percent)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+             total_pixels, tree_pixels, coverage_percent, visualization_image, geo_bounds)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (year, bounds_type) DO UPDATE SET
                 pixel_data = EXCLUDED.pixel_data,
                 data_shape = EXCLUDED.data_shape,
@@ -327,6 +334,8 @@ class PostGISRasterHandler:
                 total_pixels = EXCLUDED.total_pixels,
                 tree_pixels = EXCLUDED.tree_pixels,
                 coverage_percent = EXCLUDED.coverage_percent,
+                visualization_image = EXCLUDED.visualization_image,
+                geo_bounds = EXCLUDED.geo_bounds,
                 created_at = CURRENT_TIMESTAMP
             """
             
@@ -338,11 +347,13 @@ class PostGISRasterHandler:
                 json.dumps(bounds),
                 total_pixels,
                 tree_pixels,
-                coverage
+                coverage,
+                visualization_image,
+                json.dumps(geo_bounds)
             ))
             self.connection.commit()
             
-            print(f"✅ Cached {data.size} pixels for year {year} ({coverage:.2f}% tree coverage)")
+            print(f"✅ Cached {data.size} pixels + visualization for year {year} ({coverage:.2f}% tree coverage)")
             return True
             
         except Exception as e:
@@ -351,11 +362,62 @@ class PostGISRasterHandler:
             traceback.print_exc()
             return False
     
+    def _create_visualization_image(self, data: np.ndarray, bounds: Dict[str, Any]) -> Tuple[str, list]:
+        """Create visualization image from pixel data"""
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from io import BytesIO
+        import base64
+        
+        # Calculate geo_bounds
+        if bounds.get('type') == 'polygon':
+            coords = bounds['coordinates']
+            lats = [coord[1] for coord in coords]
+            lons = [coord[0] for coord in coords]
+            geo_bounds = [[min(lats), min(lons)], [max(lats), max(lons)]]
+        else:
+            geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
+        
+        # Create tree mask - NYC 2017 LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
+        tree_mask = np.isin(data, [1, 2])
+        
+        # Create visualization
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
+        
+        # Mask out nodata values
+        valid_data_mask = data != 0
+        
+        # Display original data with neutral colormap
+        colors_original = ['white', 'lightgray', 'lightblue', 'lightgray', 'brown', 'gray', 'lightyellow', 'lightgray']
+        cmap_original = mcolors.ListedColormap(colors_original)
+        masked_data = np.ma.masked_where(~valid_data_mask, data)
+        ax.imshow(masked_data, cmap=cmap_original, vmin=0, vmax=7, alpha=0.7, aspect='equal')
+        
+        # Overlay tree areas in green
+        tree_overlay = np.ma.masked_where(~(tree_mask & valid_data_mask), tree_mask)
+        ax.imshow(tree_overlay, cmap='Greens', alpha=0.8, vmin=0, vmax=1, aspect='equal')
+        
+        ax.axis('off')
+        plt.tight_layout(pad=0)
+        
+        # Save to bytes
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', pad_inches=0,
+                   facecolor='none', edgecolor='none', transparent=True)
+        buffer.seek(0)
+        
+        # Convert to base64
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}", geo_bounds
+    
     def get_cached_pixel_data(self, year: int, bounds_type: str = 'polygon') -> Optional[Tuple[np.ndarray, Dict[str, Any]]]:
         """Retrieve cached pixel data from database"""
         try:
             select_sql = """
-            SELECT pixel_data, data_shape, bounds_data, total_pixels, tree_pixels, coverage_percent
+            SELECT pixel_data, data_shape, bounds_data, total_pixels, tree_pixels, coverage_percent,
+                   visualization_image, geo_bounds
             FROM pixel_cache
             WHERE year = %s AND bounds_type = %s
             """
@@ -377,12 +439,14 @@ class PostGISRasterHandler:
             # Reconstruct numpy array
             data = np.frombuffer(decompressed, dtype=np.uint8).reshape(shape)
             
-            # Return data and metadata
+            # Return data and metadata including visualization
             metadata = {
                 'total_pixels': result['total_pixels'],
                 'tree_pixels': result['tree_pixels'],
                 'coverage_percent': result['coverage_percent'],
-                'bounds_data': json.loads(result['bounds_data'])
+                'bounds_data': json.loads(result['bounds_data']),
+                'visualization_image': result['visualization_image'],
+                'geo_bounds': json.loads(result['geo_bounds']) if result['geo_bounds'] else None
             }
             
             print(f"✅ Retrieved cached pixel data for year {year}: {data.shape}")
@@ -554,8 +618,8 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
                 
                 print(f"✅ Successfully read {data.shape} pixels from COG file")
                 
-                # Apply tree classification
-                tree_classes = [1]  # Tree (2) and Grass/Vegetation (7)
+                # Apply tree classification - NYC 2017 LiDAR 8-class system
+                tree_classes = [1, 2]  # Tree Canopy (1) + Grass/Shrubs (2)
                 tree_mask = np.isin(data, tree_classes)
                 
                 total_pixels = np.sum(data > 0)
