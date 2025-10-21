@@ -231,8 +231,8 @@ class PostGISRasterHandler:
                 # Fallback to official NYC data
                 if year == 2010:
                     return np.array([[21.3]])  # NYC 2010 tree canopy percentage (5ft resolution)
-                elif year == 2017:
-                    return np.array([[22.5]])  # NYC 2017 tree canopy percentage (6ft resolution)
+                elif year == 2021:
+                    return np.array([[22.5]])  # NYC 2021 tree canopy percentage (6in resolution)
                 else:
                     return None
             
@@ -249,7 +249,7 @@ class PostGISRasterHandler:
             if data is None:
                 return 0.0, "No data available"
             
-            # NYC 2017 LiDAR 8-class system:
+            # NYC LiDAR 8-class system:
             # 1=Tree Canopy, 2=Grass/Shrubs, 3=Bare Soil, 4=Water, 
             # 5=Buildings, 6=Roads, 7=Other Impervious, 8=Railroads
             tree_classes = [1, 2]  # Tree Canopy (1) + Grass/Shrubs (2)
@@ -268,8 +268,8 @@ class PostGISRasterHandler:
                 # Return realistic NYC tree coverage percentages based on year
                 if year == 2010:
                     return 21.3, "Using NYC Tree Canopy Assessment data (5ft resolution)"
-                elif year == 2017:
-                    return 22.5, "Using NYC Tree Canopy Assessment data (6ft resolution)"
+                elif year == 2021:
+                    return 22.5, "Using NYC Tree Canopy Assessment data (6in resolution)"
                 else:
                     return 0.0, "No valid pixels found"
                 
@@ -277,8 +277,8 @@ class PostGISRasterHandler:
             # Fallback to official NYC data
             if year == 2010:
                 return 21.3, f"Fallback to NYC data (5ft): {str(e)}"
-            elif year == 2017:
-                return 22.5, f"Fallback to NYC data (6ft): {str(e)}"
+            elif year == 2021:
+                return 22.5, f"Fallback to NYC data (6in): {str(e)}"
             else:
                 return 0.0, str(e)
     
@@ -307,7 +307,7 @@ class PostGISRasterHandler:
                 return False
             
             # Calculate statistics
-            # NYC 2017 LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
+            # NYC LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
             tree_classes = [1, 2]  # Tree Canopy + Grass/Shrubs
             tree_mask = np.isin(data, tree_classes)
             total_pixels = int(np.sum(data > 0))
@@ -378,7 +378,7 @@ class PostGISRasterHandler:
         else:
             geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
         
-        # Create tree mask - NYC 2017 LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
+        # Create tree mask - NYC LiDAR: 1=Tree Canopy, 2=Grass/Shrubs
         tree_mask = np.isin(data, [1, 2])
         
         # Create visualization
@@ -522,13 +522,13 @@ def initialize_lidar_datasets() -> bool:
         if not handler.register_cloud_raster(2010, LIDAR_DATASETS["2010"]):
             success = False
         
-        # Register 2017 dataset  
-        if not handler.register_cloud_raster(2017, LIDAR_DATASETS["2017"]):
+        # Register 2021 dataset  
+        if not handler.register_cloud_raster(2021, LIDAR_DATASETS["2021"]):
             success = False
         
         # Cache pixel data for both years (only done once)
         print("📥 Initializing pixel data cache...")
-        for year in [2010, 2017]:
+        for year in [2010, 2021]:
             if not handler.cache_pixel_data(year, HUDSON_SQUARE_BOUNDS):
                 print(f"⚠️ Could not cache pixel data for {year}, will read from COG on demand")
         
@@ -618,7 +618,7 @@ def get_tree_coverage_postgis(year: int) -> Tuple[float, str]:
                 
                 print(f"✅ Successfully read {data.shape} pixels from COG file")
                 
-                # Apply tree classification - NYC 2017 LiDAR 8-class system
+                # Apply tree classification - NYC LiDAR 8-class system
                 tree_classes = [1, 2]  # Tree Canopy (1) + Grass/Shrubs (2)
                 tree_mask = np.isin(data, tree_classes)
                 
@@ -656,7 +656,7 @@ if __name__ == "__main__":
         print("✅ Database connection successful")
         
         # Test raster info
-        for year in [2010, 2017]:
+        for year in [2010, 2021]:
             info = handler.get_raster_info(year)
             if info:
                 print(f"✅ Year {year} raster info: {info}")
