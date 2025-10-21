@@ -28,19 +28,21 @@ DATABASE_CONFIG = DATABASE_CONFIGS[ACTIVE_DB]
 # GCP Storage URLs for LiDAR datasets
 LIDAR_DATASETS = {
     "2010": "https://storage.googleapis.com/raster_datam/landcover_2010_nyc_05ft_cog.tif",
-    "2017": "https://storage.googleapis.com/raster_datam/NYC_2017_LiDAR_LandCover_cog.tif"
+    "2021": "https://storage.googleapis.com/raster_datam/landcover_nyc_2021_6in_cog.tif"
 }
 
-# Hudson Square study area bounds - 6-point polygon
+# Hudson Square study area bounds - 8-point polygon
 HUDSON_SQUARE_BOUNDS = {
     'type': 'polygon',
-    'coordinates': [
-        [-74.008700, 40.718700],  # Point 1: Canal & West (SW)
-        [-73.997000, 40.718700],  # Point 2: Canal & 6th Ave (SE)
-        [-73.997000, 40.726200],  # Point 3: Vandam & 6th Ave
-        [-74.003900, 40.726200],  # Point 4: Vandam & Varick
-        [-74.005800, 40.735800],  # Point 5: Clarkson & Varick (NE)
-        [-74.008700, 40.735800]   # Point 6: Clarkson & West (NW)
+    'coordinates': [ 
+        [-74.01052092337208,40.72982892345051],  # Point 1: Canal & West (SW)
+        [-74.00472530882296, 40.729355986854266],  # Point 2: Canal & 6th Ave (SE)
+        [-74.00478302321119, 40.72905955348878],  # Point 3: Vandam & 6th Ave
+        [-74.00453720266869, 40.72905307405622],  # Point 4: Vandam & Varick
+        [-74.00454789051835,40.72863352945419],  # Point 5: Clarkson & Varick (NE)
+        [-74.00286231971523,40.72833519406047],   # Point 6: Clarkson & West (NW)
+        [-74.00540521626658,40.72193973323825],   # Point 7: 
+        [-74.01094328685865,40.72583000053755]   # Point 8
     ]
 }
 
