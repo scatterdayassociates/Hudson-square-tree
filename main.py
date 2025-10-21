@@ -1145,7 +1145,7 @@ def create_tree_visualization_data(year, bounds):
                 geo_bounds = [[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]]
         
         # Create tree classification visualization (same for both cached and COG data)
-        # NYC 2017 LiDAR: Class 1 = Tree Canopy, Class 2 = Grass/Shrubs
+        # NYC LiDAR: Class 1 = Tree Canopy, Class 2 = Grass/Shrubs
         tree_mask = np.isin(data, [1, 2])  # Tree Canopy (1) + Grass/Shrubs (2)
         
         # Create a colored visualization with transparency for areas outside polygon
@@ -1220,7 +1220,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
     
     # Add Hudson Square boundary - handle both rectangle and polygon
     if HUDSON_SQUARE_BOUNDS.get('type') == 'polygon':
-        # 6-point polygon boundary
+        # 8-point polygon boundary
         coords = HUDSON_SQUARE_BOUNDS['coordinates']
         # Convert to folium format (lat, lon)
         folium_coords = [[coord[1], coord[0]] for coord in coords]
@@ -1230,7 +1230,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
             color='red',
             weight=3,
             fill=False,
-            popup="Hudson Square Study Area (6-point polygon)"
+            popup="Hudson Square Study Area (8-point polygon)"
         ).add_to(folium_map)
     else:
         # Legacy rectangle boundary
@@ -1307,7 +1307,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
                 tooltip=f"{year1} Tree Coverage: {cover_year1:.2f}%"
             ).add_to(year1_layer)
         
-        # Add ImageOverlay for Year 2 (Blue theme for 2017)  
+        # Add ImageOverlay for Year 2 (Blue theme for 2021)  
         if year2_image and year2_bounds:
             year2_overlay = raster_layers.ImageOverlay(
                 image=year2_image,
@@ -1360,7 +1360,7 @@ def create_map(cover_year1, cover_year2, year1, year2):
                 </div>
                 <div style="background: #dbeafe; padding: 10px; border-radius: 5px; margin: 10px 0;">
                     <p style="margin: 5px 0; color: #1e40af;"><strong>🔵 {year2} Coverage:</strong> {cover_year2:.2f}%</p>
-                    <p style="margin: 5px 0;"><strong>Resolution:</strong> 6ft (1.8m)</p>
+                    <p style="margin: 5px 0;"><strong>Resolution:</strong> 6in (0.15m)</p>
                 </div>
                 <div style="background: #f3f4f6; padding: 10px; border-radius: 5px; margin: 10px 0;">
                     <p style="margin: 5px 0;"><strong>📊 Change:</strong> <span style="color: {change_color};">{change:+.2f}% {change_icon}</span></p>
@@ -1459,7 +1459,7 @@ def main():
     if 'selected_year1' not in st.session_state:
         st.session_state.selected_year1 = 2010
     if 'selected_year2' not in st.session_state:
-        st.session_state.selected_year2 = 2017
+        st.session_state.selected_year2 = 2021
     if 'map_created' not in st.session_state:
         st.session_state.map_created = False
     if 'map_data' not in st.session_state:
@@ -1527,31 +1527,39 @@ def main():
         # Coordinates section
         st.markdown("""
         <div class="coordinates-section">
-            <label class="label">Coordinates</label>
+            <label class="label">Coordinates (8-point polygon)</label>
             <div class="coordinates-grid">
                 <div class="coordinate-input">
-                    <label class="input-label">Clarkson &amp; West (NW)</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.735800</div>
+                    <label class="input-label">Point 1</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0105, 40.7298</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">Clarkson &amp; Varick (NE)</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.005800</div>
+                    <label class="input-label">Point 2</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0047, 40.7294</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">Vandam &amp; Varick</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.726200</div>
+                    <label class="input-label">Point 3</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0048, 40.7291</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">Vandam &amp; 6th Ave</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.003900</div>
+                    <label class="input-label">Point 4</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0045, 40.7291</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">Canal &amp; 6th Ave (SE)</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">40.718700</div>
+                    <label class="input-label">Point 5</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0045, 40.7286</div>
                 </div>
                 <div class="coordinate-input">
-                    <label class="input-label">Canal &amp; West (SW)</label>
-                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 1.0rem; color: hsl(var(--foreground));">74.008700</div>
+                    <label class="input-label">Point 6</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0029, 40.7283</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">Point 7</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0054, 40.7219</div>
+                </div>
+                <div class="coordinate-input">
+                    <label class="input-label">Point 8</label>
+                    <div class="input" style="display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: hsl(var(--foreground));">-74.0109, 40.7258</div>
                 </div>
             </div>
         </div>
@@ -1589,8 +1597,8 @@ def main():
         
         # Streamlit controls (hidden but functional)
         col1, col2 = st.columns(2)
-        year1 = col1.selectbox("Start Year", [2010, 2017], index=0, key="year1", label_visibility="collapsed")
-        year2 = col2.selectbox("End Year", [2010, 2017], index=1, key="year2", label_visibility="collapsed")
+        year1 = col1.selectbox("Start Year", [2010, 2021], index=0, key="year1", label_visibility="collapsed")
+        year2 = col2.selectbox("End Year", [2010, 2021], index=1, key="year2", label_visibility="collapsed")
         
         if year1 == year2:
             st.error("Please select different years for comparison!")
@@ -1669,7 +1677,7 @@ def main():
             <div class="card-header">
                 <div class="default-header">
                     <h3 class="card-title">Analysis Results</h3>
-                    <div class="year-badge">2010 - 2017</div>
+                    <div class="year-badge">2010 - 2021</div>
                 </div>
                 <div class="default-header">
                 <p class="card-description">
@@ -1709,11 +1717,11 @@ def main():
             
             if error1:
              
-                cover_1 = 21.3 if year1 == 2010 else 22.5 if year1 == 2017 else 0.0
+                cover_1 = 21.3 if year1 == 2010 else 22.5 if year1 == 2021 else 0.0
         
             if error2:
               
-                cover_2 = 21.3 if year2 == 2010 else 22.5 if year2 == 2017 else 0.0
+                cover_2 = 21.3 if year2 == 2010 else 22.5 if year2 == 2021 else 0.0
       
             
             # Create visualization
@@ -1891,7 +1899,7 @@ def main():
             <div style="background: hsl(var(--muted) / 0.3); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.75rem; margin-top: 1rem; font-size: 0.875rem;">
                 <strong>💡 Map Tips:</strong> 
                 <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                    <li>Tree data resolution: 2010: 5ft (1.5m), 2017: 6ft (1.8m) from LiDAR COG files</li>
+                    <li>Tree data resolution: 2010: 5ft (1.5m), 2021: 6in (0.15m) from LiDAR COG files</li>
                     <li>Use layer controls (top-right) to toggle tree coverage layers</li>
                     <li>Click markers for detailed tree coverage information</li>
                     <li>Blue overlay shows {year1} trees, Green overlay shows {year2} trees</li>
