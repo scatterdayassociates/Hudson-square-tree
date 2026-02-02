@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Sensitive files - DO NOT COMMIT
+config.py
+seventh-tempest-348517-0e469e23d80c.json
+*.json
+.streamlit/secrets.toml
+.streamlit/env
+
+# Cache directories
+backend/tile_cache/
+backend/__pycache__/
+*.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Environment files
+.env
+.env.local
+

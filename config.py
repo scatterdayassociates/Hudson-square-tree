@@ -1,28 +1,59 @@
 """
 Configuration file for the mapping project
 Contains database and storage settings
+Reads from Streamlit secrets when available, falls back to environment variables or defaults
 """
 
 import os
 from typing import Dict, Any
 
+# Try to import streamlit for secrets access
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+    st = None
+
+
+def _get_secret(key_path: str, default: Any = None) -> Any:
+    """
+    Get value from Streamlit secrets, environment variable, or default.
+    key_path: dot-separated path like 'database.digitalocean.user'
+    """
+    if HAS_STREAMLIT:
+        try:
+            # Navigate nested secrets using dot notation
+            keys = key_path.split('.')
+            value = st.secrets
+            for key in keys:
+                value = value[key]
+            return value
+        except (KeyError, AttributeError):
+            pass
+    
+    # Fall back to environment variable
+    env_key = key_path.upper().replace('.', '_')
+    return os.getenv(env_key, default)
+
+
 # Database configuration options
+# Read from Streamlit secrets if available, otherwise use defaults
 DATABASE_CONFIGS = {
     "digitalocean": {
-        "dbname": "defaultdb",
-        "user": "doadmin", 
-        "password": "AVNS_tOw1EdQTU-OwMnbMvNn",
-        "host": "db-postgresql-nyc3-47709-do-user-19616823-0.k.db.ondigitalocean.com",
-        "port": 25060,
-        "sslmode": "require",
-        "connect_timeout": 10,  # Connection timeout in seconds
-        "options": "-c statement_timeout=30000"  # Query timeout: 30 seconds
+        "dbname": _get_secret("database.digitalocean.dbname", "defaultdb"),
+        "user": _get_secret("database.digitalocean.user", "doadmin"),
+        "password": _get_secret("database.digitalocean.password", "AVNS_tOw1EdQTU-OwMnbMvNn"),
+        "host": _get_secret("database.digitalocean.host", "db-postgresql-nyc3-47709-do-user-19616823-0.k.db.ondigitalocean.com"),
+        "port": int(_get_secret("database.digitalocean.port", 25060)),
+        "sslmode": _get_secret("database.digitalocean.sslmode", "require"),
+        "connect_timeout": int(_get_secret("database.digitalocean.connect_timeout", 10)),
+        "options": _get_secret("database.digitalocean.options", "-c statement_timeout=30000")
     },
-
 }
 
 # Active database configuration (change this to switch databases)
-ACTIVE_DB = "digitalocean"  # Options: "digitalocean", "local_postgres"
+ACTIVE_DB = _get_secret("database.active_db", "digitalocean")
 DATABASE_CONFIG = DATABASE_CONFIGS[ACTIVE_DB]
 
 # GCP Storage URLs for LiDAR datasets
@@ -47,10 +78,10 @@ HUDSON_SQUARE_BOUNDS = {
 }
 
 # Google Earth Engine project ID
-PROJECT_ID = 'seventh-tempest-348517'
+PROJECT_ID = _get_secret("gcp.project_id", "seventh-tempest-348517")
 
 # FastAPI backend URL for tile serving
-FASTAPI_URL = "https://raster-image-3863265067.us-central1.run.app"
+FASTAPI_URL = _get_secret("api.fastapi_url", "https://raster-image-3863265067.us-central1.run.app")
 
 # Map configuration
 MAP_CONFIG = {
@@ -90,3 +121,31 @@ def get_study_area_bounds() -> Dict[str, float]:
         }
     else:
         return HUDSON_SQUARE_BOUNDS.copy()
+
+
+def get_gcp_service_account() -> Dict[str, Any]:
+    """
+    Get GCP service account credentials from Streamlit secrets.
+    Returns a dictionary compatible with Google Cloud client libraries.
+    Falls back to None if not available (for non-Streamlit contexts).
+    """
+    if not HAS_STREAMLIT:
+        return None
+    
+    try:
+        sa = st.secrets["gcp"]["service_account"]
+        return {
+            "type": sa.get("type", "service_account"),
+            "project_id": sa.get("project_id", PROJECT_ID),
+            "private_key_id": sa.get("private_key_id"),
+            "private_key": sa.get("private_key"),
+            "client_email": sa.get("client_email"),
+            "client_id": sa.get("client_id"),
+            "auth_uri": sa.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": sa.get("token_uri", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": sa.get("auth_provider_x509_cert_url"),
+            "client_x509_cert_url": sa.get("client_x509_cert_url"),
+            "universe_domain": sa.get("universe_domain", "googleapis.com")
+        }
+    except (KeyError, AttributeError):
+        return None
