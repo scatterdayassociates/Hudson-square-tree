@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # FastAPI Tile Server
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: tree-cover-api
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - tree-cover-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Streamlit Frontend
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: tree-cover-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - FASTAPI_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tree-cover-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  tree-cover-network:
+    driver: bridge
+
+# Volumes for caching (optional)
+# volumes:
+#   tile-cache:
+#     driver: local
+

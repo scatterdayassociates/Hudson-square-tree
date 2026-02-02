@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 48 48"
+     width="64" height="64"
+     fill="none"
+     stroke="#6B7380"
+     stroke-width="3"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-label="Outlined tree icon">
+  <!-- canopy (zig-zag / layered) -->
+  <path d="M10 34 L18 26 L14 20 L22 14 L24 8 L26 14 L34 20 L30 26 L38 34 Z" />
+  <!-- small rounded horizontal trunk -->
+  <line x1="20" y1="40" x2="28" y2="40" />
+</svg>

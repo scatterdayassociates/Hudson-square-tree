@@ -1,0 +1,12 @@
+[gee_service_account]
+type = "service_account"
+project_id = "seventh-tempest-348517"
+private_key_id = "0e469e23d80cd3b4ec6a0bcf4d894d4b62f57bc9"
+private_key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCycJRjiyP+xOEO\nfI61S5M+pNNcvrkQ3QHC53N7ypzic608JKtDjL2AHgVAuMTF6z4skLIk7eTK7Tys\n6TaLG3Aqaa3nnERNay7XXJz/Z5xEI34TVU2YyOEju5fqhEwwbqFT0Vb1yQ4sTI91\nvR5gCL1Z75LI75Bnmv7LNFaJoExbKhALAEUupKI5MRncCGyXt2wnQrDxVIOYdbLZ\naXb/T1aZ3Co7X6ckTzHROO8hqFc5IrFSZ96TYhW+nG45kb32tVsOmptNGJV0X6kH\nS/uFOHCvh6japaSXUbACq0jd6dvZCixybKJ4VrNPFP/CP3J/PiPn/gX9AufB6bMu\nGBJiGfYNAgMBAAECggEAJ19tcqh/RQYypaRoxcqa/xnV9HM1+SlW6+dvpStAIjyF\nh02NB67smnIlVRJgAs7lLWaxFDJ0xy0BNCMScK/ZeFZQs9gYfx+tGoKaNsXpJmTR\nexkZseJzQRPx0aKnABHNIaZBoqKeMLqk9gUIiIatJ0TUVed8bMv3uCVAigYXiw62\n2+qLNlYN+PfTFYCziz+XoxqTFr/loQhXfnMX63I0icqhX9uglkvdsshEg+Bmihdq\nL4UCciVpxVDsy3FTgxVChrMUpCQwdth/nxaP06nEzeYMWaiynlBkZ//0pjj08sxy\n+HyvsRnEGHvWnBr2eravZAX+1AN5eJsJOzpnaate0QKBgQDaIUEZ+L7tHeFilOf9\ngIv4PVzLgeOgqYwL8LbH7stusP+OoAl10DYi9zvyX5ZDYatEJEeZNV5mWzOwei6O\n/WpgXCXB4xwhvc+NpmyxSWxqyYCi0FFJxtEihhts6pOtO5FSzxysffJjuJg3cyRa\nJ9Gc5Sdtblv6CaZicdH0tJd7PQKBgQDRa03bnXkumSKiUyoHN++NTia9P3vI7Jpb\n/2MrFTRRR0qe6t9KdHkmhtrodX0QLoNwA4rQLuwXwLo/qyRNi1IlqKbGWkp5/P7O\nEmeJ9fKdycIZ3lqrengoUvv4Jf3+20Q7VogAUgpktkmsBl8T8GynZSwPa4l79DAT\nMwGSTM5TEQKBgG526sYhT2c7e5l1+WpKwBeN08GH3OPPGQou9BGaH9HFtxXefAv6\nzn+0ntomiC1Fd/tBODUhbtX9F9cmeQ+WzFlSMRjYT7XSrxp4DpFVsp79vrQ1NQVc\ntyp5qcfln7XZ9cVu94FvIuJXaFaka+NwSNngvq/PdKrSWj1+kKoRDqmtAoGAIOJb\nqHey1rlfMeQjPlzvNd4mwSLd2jAlEPsqZFKBE55BPnEdPQDLIVydtVD1oXvcUdOM\nkaI8moI9/M9v9OlCrf0sqwr0lPFARbWoIobHYTWUUCGVVUX25kYZoN6+Yq2lqjet\nRXecgDILoYKinWvsc+C0KXu2bAttHSauQX3kDDECgYEAgodzTlwqdUd9ci0EIYgt\nTyJfBLR1YUlXmds+jUbDdSPf/aYIV3YVY9CWsO69Jww2HkrT92AWHYjwuMqQhJ+h\nkFr8/yQ0YKN3JVT+hXCzMrh5gTCJ2nDzOLyGBt5y9bN3UXnHuVRHc/aTr32Vah0U\n0LJqStmuAQC9ulkrqOjSE6I=\n-----END PRIVATE KEY-----\n"
+client_email = "streamlit-earth-engine@seventh-tempest-348517.iam.gserviceaccount.com"
+client_id = "109552683352913066531"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-earth-engine%40seventh-tempest-348517.iam.gserviceaccount.com"
+universe_domain = "googleapis.com"

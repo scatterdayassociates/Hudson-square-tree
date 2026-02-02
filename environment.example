@@ -1,0 +1,31 @@
+# Environment Configuration for Tree Cover Analysis System
+# Copy this file to .env and update with your values
+
+# FastAPI Backend Configuration
+FASTAPI_URL=http://localhost:8000
+LOG_LEVEL=info
+
+# Streamlit Configuration
+STREAMLIT_SERVER_PORT=8501
+STREAMLIT_SERVER_ADDRESS=0.0.0.0
+
+# Database Configuration (PostgreSQL/PostGIS)
+DB_HOST=db-postgresql-nyc3-47709-do-user-19616823-0.k.db.ondigitalocean.com
+DB_PORT=25060
+DB_NAME=defaultdb
+DB_USER=doadmin
+DB_PASSWORD=your_password_here
+DB_SSLMODE=require
+
+# Google Cloud Storage (COG URLs)
+COG_URL_2010=https://storage.googleapis.com/raster_datam/landcover_2010_nyc_05ft_cog.tif
+COG_URL_2021=https://storage.googleapis.com/raster_datam/landcover_nyc_2021_6in_cog.tif
+
+# Cache Configuration (optional)
+TILE_CACHE_DURATION=86400  # 24 hours in seconds
+TILE_CACHE_SIZE=1000       # Maximum tiles to cache in memory
+
+# Production Settings
+WORKERS=4                   # Number of uvicorn workers
+RELOAD=false                # Auto-reload (set to true for development)
+

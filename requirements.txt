@@ -1,0 +1,26 @@
+streamlit>=1.28.0
+earthengine-api>=0.1.350
+geemap>=0.24.0
+folium>=0.14.0
+geopandas>=0.13.0
+pandas>=1.5.0
+numpy>=1.24.0
+psycopg2-binary>=2.9.0
+rasterio>=1.3.0
+shapely>=2.0.0
+rio-cogeo>=3.0.0
+requests>=2.28.0
+streamlit-folium>=0.19.0        # Streamlit wrapper for Folium
+folium>=0.15.0                  # Leaflet.js for Python; includes Draw plugin
+# === RECOMMENDED OPTION 1: Leaflet Drawing (BEST FIT) ===
+streamlit-folium>=0.19.0        # Streamlit wrapper for Folium
+folium>=0.15.0                  # Leaflet.js for Python; includes Draw plugin
+
+# === IF USING OPTION 2: Canvas Drawing ===
+# streamlit-drawable-canvas>=0.2.3  # Pixel-level drawing (alternative)
+
+# === OPTIONAL: PERFORMANCE & DEBUGGING ===
+# geopandas[io]>=0.10.0         # Additional I/O backends
+# orjson>=3.8.0                 # Faster JSON for GeoJSON
+# redis>=4.3.0                  # For distributed caching (if scaling)
+# psycopg2-pool>=1.0            # Connection pooling for PostGIS
