@@ -1361,6 +1361,11 @@ def create_tree_visualization_data(year, bounds):
         traceback.print_exc()
         return None, None, str(e)
 
+def _add_sidebar_draw_controls(folium_map):
+    """No custom styling - use default Leaflet.draw toolbar so icons display correctly."""
+    pass
+
+
 def create_map(cover_year1, cover_year2, year1, year2, drawn_bounds=None, show_entire_map_coverage=False):
     """Create the interactive map using PostGIS data and COG files.
     
@@ -1379,7 +1384,7 @@ def create_map(cover_year1, cover_year2, year1, year2, drawn_bounds=None, show_e
     # Create folium map with Google Maps as base layer
     folium_map = folium.Map(
         location=[40.725, -74.005],
-        zoom_start=16,
+        zoom_start=14,  # Wider initial viewport (lower = more area visible)
         max_zoom=22,  # Increased from 18 to 22 for more zoom
         min_zoom=10,  # Reduced from 12 to 10 for wider view
         tiles=None,  # No default tiles, we'll add Google Maps
@@ -1658,11 +1663,12 @@ def create_map(cover_year1, cover_year2, year1, year2, drawn_bounds=None, show_e
             'circlemarker': False
         },
         edit_options={
-            'edit': True,
-            'remove': True
+            'edit': False,
+            'remove': False
         }
     )
     draw.add_to(folium_map)
+    _add_sidebar_draw_controls(folium_map)
     
     # Add JavaScript to capture drawn shapes and store in localStorage
     capture_script = """
@@ -1943,12 +1949,10 @@ def main():
             st.markdown("""
             <div style="margin-bottom: 1rem;">
                 <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">
-                    Draw a rectangle or polygon on the map using the drawing tools (top-left of map).
-                    Analysis will run automatically if auto-analyze is enabled.
+                    Use the <strong>drawing tools on the left side of the map</strong> (rectangle, polygon, delete). Analysis runs automatically if enabled.
                 </p>
             </div>
             """, unsafe_allow_html=True)
-            
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("Use Default Area", use_container_width=True):
@@ -2134,162 +2138,150 @@ def main():
     
     
     
-    # Show map in default state to allow drawing before analysis
+    # Show map in default state to allow drawing before analysis (fragment = only this block reruns on draw)
     if not st.session_state.analysis_run:
-        # Show Google Earth Engine status first
-        st.markdown("""
-        <div class="status-overview">
+
+        @st.fragment
+        def _drawing_map_fragment():
+            st.markdown("""
+            <div class="status-overview">
             <div class="status-indicator success">
-                <svg class="status-indicator-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 12l2 2 4-4"/>
-                    <circle cx="12" cy="12" r="9"/>
-                </svg>
-                <div class="status-indicator-content">
-                    <p class="status-indicator-title">Google Earth Engine authenticated successfully</p>
-                    <p class="status-indicator-description">Connection to satellite data services established</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Create a simple map for drawing (below the status box)
-        drawing_map = folium.Map(
-            location=[40.725, -74.005],
-            zoom_start=16,
-            max_zoom=22,
-            min_zoom=10,
-            tiles=None,
-        )
-        
-        # Add Google Maps base layer
-        folium.TileLayer(
-            tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-            attr='Google Maps',
-            name='Google Maps',
-            overlay=False,
-            control=True,
-            show=True,
-            max_zoom=22,
-            min_zoom=0
-        ).add_to(drawing_map)
-        
-        # Only show boundary if user has drawn an area (not default)
-        # This creates a cleaner initial experience where user draws first
-        if st.session_state.drawn_bounds:
-            active_preview_bounds = st.session_state.drawn_bounds
-            if active_preview_bounds.get('type') == 'polygon':
-                coords = active_preview_bounds['coordinates']
-                folium_coords = [[coord[1], coord[0]] for coord in coords]
-                folium.Polygon(
-                    locations=folium_coords,
-                    color='red',
-                    weight=3,
-                    fill=True,
-                    fillColor='red',
-                    fillOpacity=0.1,
-                    popup="Drawn Area"
-                ).add_to(drawing_map)
-            else:
-                bounds = active_preview_bounds if 'west' in active_preview_bounds else get_study_area_bounds()
-                folium.Rectangle(
-                    bounds=[[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]],
-                    color='red',
-                    weight=3,
-                    fill=True,
-                    fillColor='red',
-                    fillOpacity=0.1,
-                    popup="Drawn Area"
-                ).add_to(drawing_map)
-        
-        # Add drawing tool
-        draw = Draw(
-            export=True,
-            filename='drawn_area.geojson',
-            position='topleft',
-            draw_options={
-                'polyline': False,
-                'polygon': True,
-                'rectangle': True,
-                'circle': False,
-                'marker': False,
-                'circlemarker': False
-            },
-            edit_options={
-                'edit': True,
-                'remove': True
-            }
-        )
-        draw.add_to(drawing_map)
-        
-        # Use st_folium to capture drawn shapes automatically
-        if ST_FOLIUM_AVAILABLE:
-            map_data = st_folium(
-                drawing_map,
-                width=None,
-                height=500,
-                returned_objects=["last_draw", "all_drawings"],
-                key="drawing_map"
-            )
-
-            # Prefer last_draw, fallback to last item of all_drawings
-            last_draw = map_data.get("last_draw")
-            if not last_draw and map_data.get("all_drawings"):
-                last_draw = map_data["all_drawings"][-1]
-
-            if last_draw:
-                current_shape_id = last_draw.get("id") or str(last_draw)
-                if current_shape_id != st.session_state.last_drawn_shape:
-                    bounds = _bounds_from_drawn_feature(last_draw)
-                    if bounds:
-                        st.session_state.last_drawn_shape = current_shape_id
-                        _apply_drawn_bounds(bounds, st.session_state.auto_analyze_on_draw)
-
-                        if st.session_state.auto_analyze_on_draw:
-                            st.success("✅ Shape captured! Running analysis automatically...")
-                            st.rerun()
-                        else:
-                            st.success("✅ Shape captured! Click 'Run Tree Cover Analysis' to analyze.")
-                    else:
-                        st.warning("Could not parse drawn shape. Please try again.")
-        else:
-            # Fallback: show map without auto-capture
-            st.components.v1.html(drawing_map._repr_html_(), height=500)
-            st.info("💡 Install streamlit-folium for automatic shape capture: `pip install streamlit-folium`")
-    
-        # Analysis Results placeholder (shown below the map)
-        if st.session_state.has_drawn_area:
-            placeholder_title = "Ready to Analyze"
-            placeholder_desc = "Click 'Run Tree Cover Analysis' in the sidebar to see tree coverage results for your selected area."
-        else:
-            placeholder_title = "No area selected yet"
-            placeholder_desc = "Draw a rectangle or polygon on the map above to define your study area. Analysis will start automatically when you finish drawing."
-        
-        st.markdown(f"""
-        <div class="card default-card">
-            <div class="card-header">
-                <div class="default-header">
-                    <h3 class="card-title">Analysis Results</h3>
-                    <div class="year-badge">2010 - 2021</div>
-                </div>
-                <p class="card-description">
-                    Vegetation coverage analysis and change detection results
-                </p>
-            </div>
-            <div class="card-content">
-                <div class="default-placeholder">
-                    <svg class="default-placeholder-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
-                        <path d="M12 22V18"/>
+                    <svg class="status-indicator-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="9"/>
                     </svg>
-                    <p class="default-placeholder-title">{placeholder_title}</p>
-                    <p class="default-placeholder-description">
-                        {placeholder_desc}
+                    <div class="status-indicator-content">
+                        <p class="status-indicator-title">Google Earth Engine authenticated successfully</p>
+                        <p class="status-indicator-description">Connection to satellite data services established</p>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            drawing_map = folium.Map(
+                location=[40.725, -74.005],
+                zoom_start=14,
+                max_zoom=22,
+                min_zoom=10,
+                tiles=None,
+            )
+            # Add Google Maps base layer
+            folium.TileLayer(
+                tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                attr='Google Maps',
+                name='Google Maps',
+                overlay=False,
+                control=True,
+                show=True,
+                max_zoom=22,
+                min_zoom=0
+            ).add_to(drawing_map)
+            # Only show boundary if user has drawn an area (not default)
+            if st.session_state.drawn_bounds:
+                active_preview_bounds = st.session_state.drawn_bounds
+                if active_preview_bounds.get('type') == 'polygon':
+                    coords = active_preview_bounds['coordinates']
+                    folium_coords = [[coord[1], coord[0]] for coord in coords]
+                    folium.Polygon(
+                        locations=folium_coords,
+                        color='red',
+                        weight=3,
+                        fill=True,
+                        fillColor='red',
+                        fillOpacity=0.1,
+                        popup="Drawn Area"
+                    ).add_to(drawing_map)
+                else:
+                    bounds = active_preview_bounds if 'west' in active_preview_bounds else get_study_area_bounds()
+                    folium.Rectangle(
+                        bounds=[[bounds['south'], bounds['west']], [bounds['north'], bounds['east']]],
+                        color='red',
+                        weight=3,
+                        fill=True,
+                        fillColor='red',
+                        fillOpacity=0.1,
+                        popup="Drawn Area"
+                    ).add_to(drawing_map)
+            draw = Draw(
+                export=True,
+                filename='drawn_area.geojson',
+                position='topleft',
+                draw_options={
+                    'polyline': False,
+                    'polygon': True,
+                    'rectangle': True,
+                    'circle': False,
+                    'marker': False,
+                    'circlemarker': False
+                },
+                edit_options={
+                    'edit': False,
+                    'remove': False
+                }
+            )
+            draw.add_to(drawing_map)
+            _add_sidebar_draw_controls(drawing_map)
+            if ST_FOLIUM_AVAILABLE:
+                map_data = st_folium(
+                    drawing_map,
+                    width=None,
+                    height=700,
+                    returned_objects=["last_draw", "all_drawings"],
+                    key="drawing_map"
+                )
+                last_draw = map_data.get("last_draw")
+                if not last_draw and map_data.get("all_drawings"):
+                    last_draw = map_data["all_drawings"][-1]
+                if last_draw:
+                    current_shape_id = last_draw.get("id") or str(last_draw)
+                    if current_shape_id != st.session_state.last_drawn_shape:
+                        bounds = _bounds_from_drawn_feature(last_draw)
+                        if bounds:
+                            st.session_state.last_drawn_shape = current_shape_id
+                            _apply_drawn_bounds(bounds, st.session_state.auto_analyze_on_draw)
+                            if st.session_state.auto_analyze_on_draw:
+                                st.success("✅ Shape captured! Running analysis automatically...")
+                                st.rerun()
+                            else:
+                                st.success("✅ Shape captured! Click 'Run Tree Cover Analysis' to analyze.")
+                        else:
+                            st.warning("Could not parse drawn shape. Please try again.")
+            else:
+                st.components.v1.html(drawing_map._repr_html_(), height=700)
+                st.info("💡 Install streamlit-folium for automatic shape capture: `pip install streamlit-folium`")
+            if st.session_state.has_drawn_area:
+                placeholder_title = "Ready to Analyze"
+                placeholder_desc = "Click 'Run Tree Cover Analysis' in the sidebar to see tree coverage results for your selected area."
+            else:
+                placeholder_title = "No area selected yet"
+                placeholder_desc = "Draw a rectangle or polygon on the map above to define your study area. Analysis will start automatically when you finish drawing."
+            st.markdown(f"""
+            <div class="card default-card">
+                <div class="card-header">
+                    <div class="default-header">
+                        <h3 class="card-title">Analysis Results</h3>
+                        <div class="year-badge">2010 - 2021</div>
+                    </div>
+                    <p class="card-description">
+                        Vegetation coverage analysis and change detection results
                     </p>
                 </div>
+                <div class="card-content">
+                    <div class="default-placeholder">
+                        <svg class="default-placeholder-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/>
+                            <path d="M12 22V18"/>
+                        </svg>
+                        <p class="default-placeholder-title">{placeholder_title}</p>
+                        <p class="default-placeholder-description">
+                            {placeholder_desc}
+                        </p>
+                    </div>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
+            """, unsafe_allow_html=True)
+
+        _drawing_map_fragment()
+
     # Run analysis if button was clicked or auto-triggered
     if st.session_state.analysis_run:
         
@@ -2482,7 +2474,7 @@ def main():
                 map_data_folium = st_folium(
                     map_obj,
                     width=None,
-                    height=600,
+                    height=750,
                     returned_objects=["last_draw", "all_drawings"],
                     key=f"map_{year1}_{year2}"
                 )
@@ -2502,7 +2494,7 @@ def main():
                         st.warning("Could not parse drawn shape. Please try again.")
             else:
                 # Fallback to regular HTML component
-                st.components.v1.html(map_obj._repr_html_(), height=600)
+                st.components.v1.html(map_obj._repr_html_(), height=800)
                 st.info("💡 Install streamlit-folium for automatic shape capture: `pip install streamlit-folium`")
             
             # Show which area is being analyzed and display mode
@@ -2582,7 +2574,7 @@ def main():
             stored_bounds,
             st.session_state.show_entire_map_coverage
         )
-        components.html(map_obj._repr_html_(), height=600)
+        components.html(map_obj._repr_html_(), height=750)
 
 if __name__ == "__main__":
     main()
