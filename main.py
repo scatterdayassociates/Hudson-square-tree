@@ -1860,8 +1860,10 @@ def _apply_drawn_bounds(bounds, auto_analyze: bool):
 
 def main():
     # Initialize session state variables
+    if 'display_hsbid' not in st.session_state:
+        st.session_state.display_hsbid = True  # Default: show HSBID Tree Cover Analysis on load
     if 'analysis_run' not in st.session_state:
-        st.session_state.analysis_run = False
+        st.session_state.analysis_run = st.session_state.display_hsbid  # Run HSBID analysis on first load when display_hsbid is on
     if 'selected_year1' not in st.session_state:
         st.session_state.selected_year1 = 2010
     if 'selected_year2' not in st.session_state:
@@ -1941,9 +1943,35 @@ def main():
             <label class="label">Study Area</label>
             <p class="study-area-text">Hudson Square, NYC</p>
         </div>
-        <div class="separator"></div>
         """, unsafe_allow_html=True)
-        
+        display_hsbid_new = st.checkbox(
+            "Display HSBID Tree Cover Analysis",
+            value=st.session_state.display_hsbid,
+            key="display_hsbid_checkbox"
+        )
+        if display_hsbid_new != st.session_state.display_hsbid:
+            st.session_state.display_hsbid = display_hsbid_new
+            if display_hsbid_new:
+                # User turned ON: use Hudson Square, clear previous analysis state, re-run HSBID analysis
+                st.session_state.use_drawn_area = False
+                st.session_state.drawn_bounds = None
+                st.session_state.last_drawn_shape = None
+                st.session_state.has_drawn_area = True
+                st.session_state.map_created = False
+                st.session_state.map_data = None
+                st.session_state.analysis_run = True
+                st.rerun()
+            else:
+                # User turned OFF: clear Hudson bounds and analysis so user can draw and run custom analysis
+                st.session_state.use_drawn_area = False
+                st.session_state.drawn_bounds = None
+                st.session_state.last_drawn_shape = None
+                st.session_state.has_drawn_area = False
+                st.session_state.analysis_run = False
+                st.session_state.map_created = False
+                st.session_state.map_data = None
+                st.rerun()
+        st.markdown("""<div class="separator"></div>""", unsafe_allow_html=True)
         # Drawing Tools section
         with st.expander("Drawing Tools", expanded=True):
             st.markdown("""
@@ -2292,9 +2320,10 @@ def main():
             year1 = st.session_state.selected_year1
             year2 = st.session_state.selected_year2
             
-            # Determine which bounds to use
-            active_bounds = None
-            if st.session_state.use_drawn_area and st.session_state.drawn_bounds:
+            # Determine which bounds to use (HSBID mode always uses Hudson Square)
+            if st.session_state.get("display_hsbid", True):
+                active_bounds = HUDSON_SQUARE_BOUNDS
+            elif st.session_state.use_drawn_area and st.session_state.drawn_bounds:
                 active_bounds = st.session_state.drawn_bounds
             else:
                 active_bounds = HUDSON_SQUARE_BOUNDS
