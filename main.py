@@ -2270,7 +2270,7 @@ def main():
                 map_data = st_folium(
                     drawing_map,
                     width=None,
-                    height=700,
+                    height=800,
                     returned_objects=["last_draw", "all_drawings"],
                     key="drawing_map"
                 )
