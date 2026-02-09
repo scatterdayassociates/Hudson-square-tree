@@ -382,6 +382,24 @@ st.markdown("""
         position: relative;
         overflow: hidden;
     }
+    /* Sidebar: minimum width so content and button text don't get too cramped when dragged */
+    [data-testid="stSidebar"] {
+        min-width: 380px !important;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        min-width: 280px !important;
+    }
+    /* Sidebar buttons: center text, allow wrap when sidebar is narrow so text doesn't cut off */
+    [data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+        white-space: normal;
+        word-wrap: break-word;
+        min-height: 2.75rem;
+        padding: 0.5rem 0.75rem;
+        line-height: 1.3;
+    }
 
     .stButton > button:hover {
         background: hsl(210 100% 45%);
@@ -732,26 +750,29 @@ st.markdown("""
     .study-area {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-        margin-top: 1rem;
+        gap: 0;
+        margin-top: 0.5rem;
     }
     
     .label {
         font-size: 1.25rem;
         font-weight: 500;
         color: hsl(var(--foreground));
+        margin: 0;
+        line-height: 1.2;
     }
     
     .study-area-text {
         font-size: 1.25rem;
         color: hsl(var(--muted-foreground));
-        margin-top: 0.25rem;
+        margin-bottom: 0.5;
+        line-height: 1.2;
     }
     
     .separator {
         height: 1px;
         background-color: hsl(var(--border));
-        margin: 1rem 0;
+        margin-top: -0.5rem ;
     }
     
     .coordinates-section {
@@ -895,23 +916,20 @@ st.markdown("""
     .status-indicator-content {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-        
-   
+        gap: 0.05rem;
     }
     
     .status-indicator-title {
         font-weight: 600;
         font-size: 0.875rem;
-        margin: 0.5rem;
+        margin: 0.25rem 0.5rem 0 0.5rem;
         line-height: 1.2;
     }
     
     .status-indicator-description {
         font-size: 0.75rem;
         opacity: 0.8;
-        margin-top: -0.5rem;
-        margin-bottom: 0;
+        margin: 0 0.5rem 0.25rem 0.5rem;
     }
     
     /* Results Section */
@@ -1983,7 +2001,7 @@ def main():
             """, unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("Use Default Area", use_container_width=True):
+                if st.button("Use Default", use_container_width=True):
                     st.session_state.use_drawn_area = False
                     st.session_state.drawn_bounds = None
                     st.session_state.last_drawn_shape = None
@@ -1993,7 +2011,7 @@ def main():
                     st.success("Using default Hudson Square area")
                     st.rerun()
             with col2:
-                if st.button("Clear Drawn Area", use_container_width=True):
+                if st.button("Clear Drawn", use_container_width=True):
                     st.session_state.use_drawn_area = False
                     st.session_state.drawn_bounds = None
                     st.session_state.last_drawn_shape = None
