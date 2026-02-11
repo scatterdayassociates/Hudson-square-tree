@@ -2270,7 +2270,7 @@ def main():
                 map_data = st_folium(
                     drawing_map,
                     width=None,
-                    height=800,
+                    height=1200,
                     returned_objects=["last_draw", "all_drawings"],
                     key="drawing_map"
                 )
@@ -2292,7 +2292,7 @@ def main():
                         else:
                             st.warning("Could not parse drawn shape. Please try again.")
             else:
-                st.components.v1.html(drawing_map._repr_html_(), height=700)
+                st.components.v1.html(drawing_map._repr_html_(), height=1200)
                 st.info("💡 Install streamlit-folium for automatic shape capture: `pip install streamlit-folium`")
             if st.session_state.has_drawn_area:
                 placeholder_title = "Ready to Analyze"
@@ -2521,7 +2521,7 @@ def main():
                 map_data_folium = st_folium(
                     map_obj,
                     width=None,
-                    height=750,
+                    height=1200,
                     returned_objects=["last_draw", "all_drawings"],
                     key=f"map_{year1}_{year2}"
                 )
@@ -2541,7 +2541,7 @@ def main():
                         st.warning("Could not parse drawn shape. Please try again.")
             else:
                 # Fallback to regular HTML component
-                st.components.v1.html(map_obj._repr_html_(), height=800)
+                st.components.v1.html(map_obj._repr_html_(), height=1200)
                 st.info("💡 Install streamlit-folium for automatic shape capture: `pip install streamlit-folium`")
             
             # Show which area is being analyzed and display mode
@@ -2621,7 +2621,7 @@ def main():
             stored_bounds,
             st.session_state.show_entire_map_coverage
         )
-        components.html(map_obj._repr_html_(), height=750)
+        components.html(map_obj._repr_html_(), height=1200)
 
 if __name__ == "__main__":
     main()
